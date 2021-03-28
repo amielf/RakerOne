@@ -1,2 +1,2 @@
-raker_base
+raker_base:raker_base_bring_up:raker_base_description
 -DCATKIN_DEVEL_PREFIX=/home/amiel/RakerOne/Base-Navigation/raker_base_ws/devel -DCMAKE_INSTALL_PREFIX=/home/amiel/RakerOne/Base-Navigation/raker_base_ws/install -G Unix Makefiles

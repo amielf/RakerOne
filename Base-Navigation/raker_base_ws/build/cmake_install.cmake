@@ -131,7 +131,9 @@ endif()
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for each subdirectory.
   include("/home/amiel/RakerOne/Base-Navigation/raker_base_ws/build/gtest/cmake_install.cmake")
+  include("/home/amiel/RakerOne/Base-Navigation/raker_base_ws/build/raker_base_bring_up/cmake_install.cmake")
   include("/home/amiel/RakerOne/Base-Navigation/raker_base_ws/build/raker_base/cmake_install.cmake")
+  include("/home/amiel/RakerOne/Base-Navigation/raker_base_ws/build/raker_base_description/cmake_install.cmake")
 
 endif()
 
