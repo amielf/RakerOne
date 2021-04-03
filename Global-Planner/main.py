@@ -1,14 +1,12 @@
+import debug
 import planner
-import sim
+import simulation
 
 if __name__ == '__main__':
-    gp = planner.GlobalPlanner()
+    debug.on()
 
-    config = {
-        "plan_interval_ms": 5000,
-        "fleet_sync_interval_ms": 200
-    }
+    planner = planner.GlobalPlanner()
 
-    wrapper = sim.Simulation(gp, config)
-    # wrapper = ros.RosWrapper(gp)
-    wrapper.run()
+    wrapper = simulation.Simulation("config.json")
+    # wrapper = ros.RosWrapper(planner)
+    wrapper.run(planner)

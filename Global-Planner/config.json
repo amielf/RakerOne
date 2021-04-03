@@ -1,0 +1,17 @@
+{
+    "simulation_settings": {
+        "n_robots": 10
+    },
+
+    "interval_settings": {
+        "update_plan": 1000,
+        "sync_poses": 25,
+        "sync_robots": 100
+    },
+
+    "world_settings": {
+        "width_mm": 18288,
+        "height_mm": 73152,
+        "resolution_mm": 1000
+    }
+}

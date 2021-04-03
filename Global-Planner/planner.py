@@ -1,43 +1,47 @@
-class _Plan:
+import cmd
+import math
+
+def _transform(frame, vector):
+    rad = math.radians(frame[2])
+    cos = math.cos(rad); sin = math.sin(rad)
+
+    return (
+        vector[0] * cos - vector[1] * sin + frame[0],
+        vector[0] * sin + vector[1] * cos + frame[1]
+    )
+
+class Map:
     def __init__(self):
-        self.waypoints = {}
+        self.grid = {}
 
-class TrafficPattern:
-    def plan(self, start, goal):
-        moved_y = (start[0], goal[1], start[2])
-        dx = goal[0] - start[0]
-        face_destination = (moved_y[0], moved_y[1], moved_y[2] - 90 if dx > 0 else 90)
-        moved_x = (goal[0], goal[1], face_destination[2])
-
-        waypoints = [moved_y, face_destination, moved_x, goal]
-        return waypoints
+    def update(self, map):
+        pass
 
 class GlobalPlanner:
     def __init__(self):
-        self._tp = TrafficPattern()
-
         self.poses = {}
-        self.destinations = {}
+        self.cqs = {}
 
-    def _set_destinations(self):
-        for id in self.poses:
-            try: pose = self.destinations[id]
-            except KeyError: pose = self.poses[id]
-
-            self.destinations[id] = (pose[0] + 100, pose[1] + 100 * id, pose[2])
-
-    def sync(self, poses):
+    # Sync Functions
+    def sync_poses(self, poses):
         self.poses = poses
 
-    def compute(self):
-        plan = _Plan()
+    def sync_robot(self, id, map, trash, report):
+        pass
 
-        self._set_destinations()
+    # Run
+    def get(self):
+        commands = {}
 
         for id, pose in self.poses.items():
-            try: destination = self.destinations[id]
-            except KeyError: continue
+            if id in self.cqs: continue
+            self.cqs[id] = [cmd.Command("Move", (5000, 0, 0))]
 
-            plan.waypoints[id] = self._tp.plan(pose, destination)
+        for id, cq in self.cqs.items():
+            if len(cq) == 0: continue
 
-        return plan
+            if cq[0].state == cmd.Queued:
+                commands[id] = cq[0]
+                cq[0].state = cmd.Active
+
+        return commands
