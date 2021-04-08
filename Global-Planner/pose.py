@@ -8,24 +8,10 @@ class Pose2D:
         self.x = x; self.y = y
         self.a = a
 
-    def distance(self, position):
-        dx = position[0] - self.x
-        dy = position[1] - self.y
+    def distance(self, pose):
+        dx = pose.x - self.x
+        dy = pose.y - self.y
         return math.hypot(dx, dy)
 
     def __str__(self): return f"Pose2D({self.x}, {self.y}, {self.a})"
     def __repr__(self): return f"Pose2D({self.x}, {self.y}, {self.a})"
-
-def relative_to(origin, pose):
-    dx = pose.x - origin.x
-    dy = pose.y - origin.y
-    da = pose.a - origin.a
-
-    rad = math.radians(-origin.a)
-    cos = math.cos(rad); sin = math.sin(rad)
-
-    return Pose2D(
-        dx * cos - dy * sin,
-        dx * sin + dy * cos,
-        da
-    )

@@ -1,10 +1,12 @@
-import action
 import camera
+import world
 import debug
 import entities
 import json
 import pose
 import pygame
+import random
+import tf
 
 class _IntervalTimer:
     def __init__(self, interval, func):
@@ -45,17 +47,36 @@ class Simulation:
 
         simulation_settings = config["simulation_settings"]
         interval_settings = config["interval_settings"]
+        world_settings = config["world_settings"]
+        robot_settings = config["robot_settings"]
 
-        self._carrier = entities.Carrier()
-        self._robots = {i + 1: entities.Robot() for i in range(simulation_settings["n_robots"])}
-        self._trash = [entities.Trash("bottle", 0.99) for _ in range(1)]
-        self._obstacles = []
+        self._world = world.World(
+            world_settings["width_mm"],
+            world_settings["height_mm"],
+            robot_settings["lidar_resolution_mm"]
+        )
 
-        self._update_plan_timer = _IntervalTimer(interval_settings["update_plan"], self._update_plan)
-        self._sync_poses_timer = _IntervalTimer(interval_settings["sync_poses"], self._sync_poses)
-        self._sync_robots_timer = _IntervalTimer(interval_settings["sync_robots"], self._sync_robots)
+        self._carrier = entities.Carrier(
+            simulation_settings["carrier_speed_mph"] * 0.44704  # mph => mm per sec
+        )
 
-        self._actions = {}
+        self._robots = {
+            i + 1: entities.Husky(
+                robot_settings["lidar_range_mm"],
+                robot_settings["yolo_range_mm"]
+            )
+
+            for i in range(simulation_settings["n_robots"])
+        }
+
+        self._litter = [
+            entities.Trash("bottle", 0.99)
+            for _ in range(100)
+        ]
+
+        self._update_plan_timer = _IntervalTimer(interval_settings["update_plan_interval_ms"], self._update_plan)
+        self._sync_poses_timer = _IntervalTimer(interval_settings["sync_poses_interval_ms"], self._sync_poses)
+        self._sync_robots_timer = _IntervalTimer(interval_settings["sync_robots_interval_ms"], self._sync_robots)
 
         self._events = _EventPump(self)
         self._events.handle(pygame.QUIT, self._on_quit)
@@ -84,65 +105,41 @@ class Simulation:
         debug.log(f"Plan Updated: {plan}")
 
         for id, command in plan.items():
-            self._actions[id] = action.create(command)
+            self._robots[id].execute(command)
 
     def _sync_poses(self, planner):
         poses = {}
         for id, robot in self._robots.items():
-            pose_relative = pose.relative_to(self._carrier.pose, robot.pose)
-            pose_tuple = (
-                pose_relative.x,
-                pose_relative.y,
-                pose_relative.a
-            )
-            poses[id] = pose_tuple
+            pose_relative_to_carrier = tf.relative(self._carrier.pose, robot.pose)
+            poses[id] = pose_relative_to_carrier
 
         planner.sync_poses(poses)
 
     def _sync_robots(self, planner):
-        discoveries = {}
-
         for id, robot in self._robots.items():
-            terrain_seen = []
-            # TODO: Implement true LIDAR visibility shape
+            grid = robot.get_partial_grid(self._world)
+            litter = robot.get_visible_litter(self._litter)
 
+            report = None
+            if robot.action is not None:
+                report = (robot.action.done, robot.action.failed, robot.action.payload)
 
-            litter_seen = []
-            for item in self._trash:
-                # TODO: Implement true camera visibility shape
-                if robot.pose.distance(item.pose.position) < 1000:
-                    pose_relative = pose.relative_to(robot.pose, item.pose)
-                    litter_seen.append(
-                        (
-                            pose_relative.position,
-                            item.type,
-                            item.certainty
-                        )
-                    )
-
-            discoveries[id] = litter_seen
-
-        reports = {}
-
-        for id, action in self._actions.items():
-            reports[id] = (action.done, action.failed, action.payload)
-
-        for id in self._robots:
-            trash = discoveries[id]
-
-            try: report = reports[id]
-            except KeyError: report = None
-
-            planner.sync_robot(id, map, trash, report)
+            planner.sync_robot(id, grid, litter, report)
 
     # Run
     def run(self, planner):
         for id, robot in self._robots.items():
             robot.pose.x = 2000 * id
+            robot.pose.y = 2000
             robot.pose.a = 90
 
-        for trash in self._trash:
-            trash.pose = pose.Pose2D(6000, 5000, 0)
+        padding = 1000
+        for trash in self._litter:
+            trash.pose = pose.Pose2D(
+                random.randint(padding, self._world.width - padding),
+                random.randint(padding, 19000),
+                0
+            )
 
         self._sync_poses(planner)
 
@@ -152,23 +149,24 @@ class Simulation:
             dt = self._clock.tick(60)
 
             if not self._paused:
-                #self._carrier.pose.y += 0.89408 * dt
+                self._carrier.pose.y += self._carrier.speed * dt
 
                 self._update_plan_timer.tick(dt, planner)
 
-                finished = []
-                for id, action in self._actions.items():
-                    robot = self._robots[id]
-                    action.run(dt, robot)
-
-                    if action.done: finished.append(id)
-
-                for id in finished: del self._actions[id]
+                for id, robot in self._robots.items():
+                    robot.update(dt)
 
                 self._sync_poses_timer.tick(dt, planner)
                 self._sync_robots_timer.tick(dt, planner)
 
-            self._camera.render(self._carrier, self._robots, self._trash)
-            self._camera.debug(planner)
+            # Visualize
+            self._camera.render(
+                planner,
+                self._world,
+                self._carrier,
+                self._robots,
+                self._litter,
+                self._paused
+            )
 
             pygame.display.flip()
