@@ -1,9 +1,7 @@
 import abc
 import actions
-import math
 import pose
 import pygame
-import random
 import tf
 
 class Entity(abc.ABC):
@@ -19,11 +17,14 @@ class Carrier(Entity):
         self.speed = speed
 
 class Husky(Entity):
-    def __init__(self, lidar_range, yolo_range):
+    def __init__(self, full_charge, lidar_range, yolo_range):
         super(Husky, self).__init__()
         self.dimensions.update(990, 660)
 
         self.action = None
+
+        self.charge = full_charge
+        self.full_charge = full_charge
 
         self.lidar_range = lidar_range
         self.yolo_range = yolo_range
@@ -40,32 +41,32 @@ class Husky(Entity):
     def get_partial_grid(self, world):
         hops = self.lidar_range // world.resolution
 
-        pose_col = int(self.pose.x // world.resolution)
-        pose_row = int(self.pose.y // world.resolution)
+        pose_row = int(self.pose.y / world.resolution)
+        pose_col = int(self.pose.x / world.resolution)
 
         grid = {}
-        for r in range(-hops, hops):
-            for c in range(-hops, hops):
+        for r in range(-hops, hops + 1):
+            for c in range(-hops, hops + 1):
                 access_row = r + pose_row
                 access_col = c + pose_col
 
-                if access_row < 0 or world.rows <= access_row: continue
-                if access_col < 0 or world.cols <= access_col: continue
+                if not (0 <= access_row < world.rows): continue
+                if not (0 <= access_col < world.cols): continue
 
-                score = world.terrain[access_row][access_col]
-
-                grid[(r, c)] = score
+                # TODO: Simulate occupancy
+                scores = world.terrain[access_row][access_col]
+                grid[(r, c)] = scores
 
         return grid
 
     # Classifier
     def get_visible_litter(self, all_litter):
-        litter = []
+        visible_litter = []
         for trash in all_litter:
             # TODO: Implement true camera visibility shape
             if self.pose.distance(trash.pose) < self.yolo_range:
                 pose_relative_to_robot = tf.relative(self.pose, trash.pose)
-                litter.append(
+                visible_litter.append(
                     (
                         pose_relative_to_robot,
                         trash.type,
@@ -73,7 +74,7 @@ class Husky(Entity):
                     )
                 )
 
-        return litter
+        return visible_litter
 
 class Trash(Entity):
     def __init__(self, type, certainty):

@@ -96,18 +96,24 @@ class Camera:
             end = self._get_render_position((x, y_max))
             pygame.draw.line(self._surface, colors.LightGray, start, end, 1)
 
-    def _draw_entity(self, entity, image, draw_frame = False):
-        footprint = pygame.Rect(entity.pose.x, entity.pose.y, entity.dimensions.x, entity.dimensions.y)
+    def _draw_entity(self, entity, image, draw_frame = False, pose_offset = (0, 0)):
+        footprint = pygame.Rect(
+            0,
+            0,
+            entity.dimensions.x,
+            entity.dimensions.y
+        )
+        footprint.center = entity.pose.position
+
         if not self._visible_world_rect.colliderect(footprint): return
 
         image = pygame.transform.scale(image, self._get_render_dimensions(entity.dimensions))
-
         if entity.pose.a != 0:
             image = pygame.transform.rotate(image, entity.pose.a)
 
-        render_position = self._get_render_position(entity.pose.position)
-
-        self._surface.blit(image, image.get_rect(center = render_position))
+        pose_render_position = self._get_render_position(entity.pose.position)
+        image_render_position = self._get_render_position((entity.pose.x + pose_offset[0], entity.pose.y + pose_offset[1]))
+        self._surface.blit(image, image.get_rect(center = image_render_position))
 
         if draw_frame:
             frame_image = self._frame_image
@@ -115,7 +121,7 @@ class Camera:
             if entity.pose.a != 0:
                 frame_image = pygame.transform.rotate(self._frame_image, entity.pose.a)
 
-            self._surface.blit(frame_image, frame_image.get_rect(center = render_position))
+            self._surface.blit(frame_image, frame_image.get_rect(center = pose_render_position))
 
     # Rendering
     def _get_render_position(self, world_position):
@@ -155,7 +161,7 @@ class Camera:
             )
 
         # World
-        self._draw_world(world)
+        #self._draw_world(world)
 
         # Litter
         for trash in litter:
@@ -171,15 +177,15 @@ class Camera:
 
             self._draw_entity(husky, husky_image)
 
-            husky_render_position = self._get_render_position(husky.pose.position)
-            lidar_radius, yolo_radius = self._get_render_dimensions((husky.lidar_range, husky.yolo_range))
-            pygame.draw.circle(self._surface, (112, 146, 190), husky_render_position, lidar_radius, 1)
-            pygame.draw.circle(self._surface, (63, 72, 204), husky_render_position, yolo_radius, 1)
+            # husky_render_position = self._get_render_position(husky.pose.position)
+            # lidar_radius, yolo_radius = self._get_render_dimensions((husky.lidar_range, husky.yolo_range))
+            # pygame.draw.circle(self._surface, (112, 146, 190), husky_render_position, lidar_radius, 2)
+            # pygame.draw.circle(self._surface, (63, 72, 204), husky_render_position, yolo_radius, 2)
 
         # Carrier
-        #self._draw_entity(carrier, self._bus_image, draw_frame = True)
+        self._draw_entity(carrier, self._bus_image, draw_frame = True, pose_offset = (-carrier.dimensions[0] / 2, 0))
 
-        # Debug
+        # Poses
         for id, robot in planner.robots.items():
             # The planner's robot pose is relative to the carrier; transform back to global coordinates to draw
             robot_pose_absolute = tf.absolute(carrier.pose, robot.pose)
@@ -188,16 +194,26 @@ class Camera:
             robot_render_position = self._get_render_position(robot_pose_absolute.position)
             pygame.draw.circle(self._surface, colors.HotPink, robot_render_position, 3)
 
-            for trash in robot.litter:
-                # The planner's trash location is relative to the robot; transform to global
-                trash_pose_absolute = tf.absolute(robot_pose_absolute, trash[0])
-                trash_render_position = self._get_render_position(trash_pose_absolute.position)
-                pygame.draw.line(self._surface, colors.LightSkyBlue, robot_render_position, trash_render_position, 1)
+        # Map
+        cell_render_size = self._get_render_dimensions((world.resolution, world.resolution))
+        cell_rect = pygame.Rect(0, 0, *cell_render_size)
 
-        tile_render_size = self._get_render_dimensions((world.resolution, world.resolution))
         for row, col in planner.map.area:
-            tile_render_position = self._get_render_position((col * world.resolution, row * world.resolution))
-            pygame.draw.rect(self._surface, colors.LightSkyBlue, (*tile_render_position, *tile_render_size), 1)
+            cell_rect.bottomleft = self._get_render_position((col * world.resolution, row * world.resolution))
+            pygame.draw.rect(self._surface, colors.LightGray, cell_rect, 1)
+
+        for row, col in planner.map.frontier:
+            cell_rect.bottomleft = self._get_render_position((col * world.resolution, row * world.resolution))
+            pygame.draw.rect(self._surface, colors.Red, cell_rect, 1)
+
+        # Tasks
+        for location, trash in planner.tasks.retrieval_tasks.items():
+            render_position = self._get_render_position(location)
+            pygame.draw.circle(self._surface, colors.DarkRed, render_position, 10, 2)
+
+        for location in planner.tasks.explore_tasks:
+            render_position = self._get_render_position(location)
+            pygame.draw.circle(self._surface, colors.MidnightBlue, render_position, 10, 2)
 
         if paused:
-            self._surface.blit(self._pause_image, self._pause_image.get_rect())
+            self._surface.blit(self._pause_image, self._pause_image.get_rect(topleft = (10, 10)))

@@ -60,8 +60,9 @@ class Simulation:
             simulation_settings["carrier_speed_mph"] * 0.44704  # mph => mm per sec
         )
 
-        self._robots = {
+        self._huskies = {
             i + 1: entities.Husky(
+                robot_settings["full_charge_v"],
                 robot_settings["lidar_range_mm"],
                 robot_settings["yolo_range_mm"]
             )
@@ -105,35 +106,39 @@ class Simulation:
         debug.log(f"Plan Updated: {plan}")
 
         for id, command in plan.items():
-            self._robots[id].execute(command)
+            self._huskies[id].execute(command)
 
     def _sync_poses(self, planner):
         poses = {}
-        for id, robot in self._robots.items():
+        for id, robot in self._huskies.items():
             pose_relative_to_carrier = tf.relative(self._carrier.pose, robot.pose)
             poses[id] = pose_relative_to_carrier
 
         planner.sync_poses(poses)
 
     def _sync_robots(self, planner):
-        for id, robot in self._robots.items():
-            grid = robot.get_partial_grid(self._world)
-            litter = robot.get_visible_litter(self._litter)
+        for id, husky in self._huskies.items():
+            charge = 100 * (husky.charge / husky.full_charge)
+
+            # TODO: This might not happen all the time, if too expensive it can be report payload of an Explore task instead
+            grid = husky.get_partial_grid(self._world)
+
+            litter = husky.get_visible_litter(self._litter)
 
             report = None
-            if robot.action is not None:
-                report = (robot.action.done, robot.action.failed, robot.action.payload)
+            if husky.action is not None:
+                report = (husky.action.done, husky.action.failed, husky.action.payload)
 
-            planner.sync_robot(id, grid, litter, report)
+            planner.sync_robot(id, charge, grid, litter, report)
 
     # Run
     def run(self, planner):
-        for id, robot in self._robots.items():
+        for id, robot in self._huskies.items():
             robot.pose.x = 2000 * id
-            robot.pose.y = 2000
-            robot.pose.a = 90
+            robot.pose.y = -500
+            robot.pose.a = random.randint(60, 120)
 
-        padding = 1000
+        padding = 2000
         for trash in self._litter:
             trash.pose = pose.Pose2D(
                 random.randint(padding, self._world.width - padding),
@@ -145,7 +150,6 @@ class Simulation:
 
         while True:
             self._events.process(self)
-
             dt = self._clock.tick(60)
 
             if not self._paused:
@@ -153,7 +157,7 @@ class Simulation:
 
                 self._update_plan_timer.tick(dt, planner)
 
-                for id, robot in self._robots.items():
+                for id, robot in self._huskies.items():
                     robot.update(dt)
 
                 self._sync_poses_timer.tick(dt, planner)
@@ -164,7 +168,7 @@ class Simulation:
                 planner,
                 self._world,
                 self._carrier,
-                self._robots,
+                self._huskies,
                 self._litter,
                 self._paused
             )

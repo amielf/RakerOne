@@ -9,4 +9,4 @@ class World:
         self.rows = math.ceil(height / resolution)
         self.cols = math.ceil(width / resolution)
 
-        self.terrain = [[random.randint(0, 100) for _ in range(self.cols)] for _ in range(self.rows)]
+        self.terrain = [[tuple(random.randint(0, 100) for _ in range(8)) for _ in range(self.cols)] for _ in range(self.rows)]
