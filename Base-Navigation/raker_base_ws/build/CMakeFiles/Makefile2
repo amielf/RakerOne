@@ -455,6 +455,24 @@ clean: raker_base_bring_up/CMakeFiles/_catkin_empty_exported_target.dir/clean
 .PHONY : clean
 
 #=============================================================================
+# Directory level rules for directory raker_laser_assembler
+
+# Convenience name for "all" pass in the directory.
+raker_laser_assembler/all:
+
+.PHONY : raker_laser_assembler/all
+
+# Convenience name for "clean" pass in the directory.
+raker_laser_assembler/clean:
+
+.PHONY : raker_laser_assembler/clean
+
+# Convenience name for "preinstall" pass in the directory.
+raker_laser_assembler/preinstall:
+
+.PHONY : raker_laser_assembler/preinstall
+
+#=============================================================================
 # Directory level rules for directory raker_base
 
 # Convenience name for "all" pass in the directory.

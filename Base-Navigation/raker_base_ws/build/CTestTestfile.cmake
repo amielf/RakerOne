@@ -6,5 +6,6 @@
 # testing this directory and lists subdirectories to be tested as well.
 subdirs("gtest")
 subdirs("raker_base_bring_up")
+subdirs("raker_laser_assembler")
 subdirs("raker_base")
 subdirs("raker_base_description")

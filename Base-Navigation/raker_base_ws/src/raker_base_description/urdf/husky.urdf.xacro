@@ -141,13 +141,25 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
   
   <xacro:if value="$(arg laser_enabled)">
 
-  	<xacro:include filename="$(find velodyne_description)/urdf/VLP-16.urdf.xacro"/>
-  	<xacro:VLP-16 parent="base_link" name="velodyne" topic="/velodyne_points" organize_cloud="false" hz="10" samples="440" gpu="false" lasers="16" max_range="100">
-    	  <origin xyz="0 0 0.3" rpy="0 0 0" />
-  	</xacro:VLP-16>
+  	<xacro:include filename="$(find velodyne_description)/urdf/HDL-32E.urdf.xacro"/>
+  	<xacro:HDL-32E parent="base_link" name="velodyne" topic="/velodyne_points" organize_cloud="false" hz="10" samples="220" gpu="false" lasers="16" max_range="30">
+    	  <origin xyz="0 0 0.4" rpy="0 0 0" />
+  	</xacro:HDL-32E>
 
   </xacro:if>
- 
+
+ <!--
+
+  <xacro:if value="$(arg laser_enabled)">
+
+        <xacro:include filename="$(find velodyne_description)/urdf/VLP-16.urdf.xacro"/>
+        <xacro:VLP-16 parent="base_link" name="velodyne" topic="/velodyne_points" organize_clou
+d="false" hz="10" samples="440" gpu="false" lasers="16" max_range="100">
+          <origin xyz="0 0 0.4" rpy="0 0 0" />
+        </xacro:VLP-16>
+
+  </xacro:if>
+-->
 
   <!--
   <xacro:if value="$(arg laser_enabled)">
