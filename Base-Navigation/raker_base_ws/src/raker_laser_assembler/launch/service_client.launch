@@ -1,0 +1,4 @@
+<launch>
+    <node pkg="raker_laser_assembler" type="call_assembler.py" name="test_client" output="screen" >
+    </node>
+</launch>
