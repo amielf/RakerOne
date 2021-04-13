@@ -5,37 +5,36 @@ import math
 
 class CarrierQueue:
     def __init__(self, unassigned_litter, robots, frontier_choices):
-        self.retrieval_tasks = {}
-        self.explore_tasks = set()
+        # self.retrieval_tasks = {}
+        # self.explore_tasks = set()
         self.unassigned_litter = unassigned_litter
         self.robots = robots
         self.frontier_choices = frontier_choices
 
-    def create_retrieval_tasks(self, robot_pose, litter):
-        for trash in litter:
-            trash_pose, type, certainty = trash
-            trash_pose_absolute = tf.absolute(robot_pose, trash_pose)
+    # def create_retrieval_tasks(self, robot_pose, litter):
+    #     for trash in litter:
+    #         trash.location, type, certainty = trash
+    #         trash_pose_absolute = tf.absolute(robot_pose, trash_pose)
+    #
+    #         if trash_pose_absolute.position not in self.retrieval_tasks and certainty > 0.5:
+    #             self.retrieval_tasks[trash_pose_absolute.position] = (type, certainty)
 
-            if trash_pose_absolute.position not in self.retrieval_tasks and certainty > 0.5:
-                self.retrieval_tasks[trash_pose_absolute.position] = (type, certainty)
-
-    # Do this on the fly during allocation if there are free robots
-    def create_explore_tasks(self, map, lanes):
-        self.explore_tasks.clear()
-
-        half_resolution = map.resolution / 2
-
-        # TODO: Smarter paritioning and point selection; no need for tons of explore tasks
-        for row, col in map.frontier:
-            position = (
-                col * map.resolution + half_resolution,
-                row * map.resolution + half_resolution
-            )
-
-            self.explore_tasks.add(position)
-
-    def create_service_tasks(self):
-        pass
+    # # Do this on the fly during allocation if there are free robots
+    # def create_explore_tasks(self, map, lanes):
+    #     self.explore_tasks.clear()
+    #
+    #     half_resolution = map.resolution / 2
+    #
+    #     # TODO: Smarter paritioning and point selection; no need for tons of explore tasks
+    #     for row, col in map.frontier:
+    #         position = (
+    #             col * map.resolution + half_resolution,
+    #             row * map.resolution + half_resolution
+    #         )
+    #
+    #         self.explore_tasks.add(position)
+    def create_task(self, robot, location, type):
+        robot.to_do.append((location, type))
 
 
     def allocate(self, unassigned_litter, robots, frontier_choices):
@@ -49,12 +48,12 @@ class CarrierQueue:
         for robot in robots:
             if robot.bin >= 8:
                 # create a service task
-                # Service((0,0,180), robot)
+                self.create_task(robot, (0, 0), 'service')
                 if robot not in allocated_robots:
                     allocated_robots.append(robot)
             if robot.charge <= 25:
                 # create a service task
-                # Service((0,0,180), robot)
+                self.create_task(robot, (0, 0), 'service')
                 if robot not in allocated_robots:
                     allocated_robots.append(robot)
 
@@ -69,7 +68,7 @@ class CarrierQueue:
                 print ("litter cannot be retrieved at Location" + str(item.location))
                 # need to flag this item. Keep in a list?
             if len(matches) == 1:
-                # Create a retrival task
+                self.create_task(robot, item.location, 'pick')
                 if matches[0] not in allocated_robots:
                     allocated_robots.append(matches[0])
             else:
@@ -93,9 +92,10 @@ class CarrierQueue:
                     if dist <= distance:
                         distance = dist
                         choice = point
-                    #create explore task for robot at choice
+                    self.create_task(robot, choice, 'explore')
+                    allocated_robots.append(robot)
 
-                    
+
 class Map:
     def __init__(self, resolution):
         self.resolution = resolution
