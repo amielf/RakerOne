@@ -74,7 +74,7 @@ class Simulation:
 
         self._litter = [
             entities.Trash("bottle", 0.99)
-            for _ in range(100)
+            for _ in range(500)
         ]
 
         self._update_plan_timer = _IntervalTimer(interval_settings["update_plan_interval_ms"], self._update_plan)
@@ -113,7 +113,7 @@ class Simulation:
     def _sync_poses(self, planner):
         poses = {}
         for id, husky in self._huskies.items():
-            pose_relative_to_carrier = tf.relative(self._carrier.pose, husky.pose)
+            pose_relative_to_carrier = tf.relative_pose(self._carrier.pose, husky.pose)
             poses[id] = pose_relative_to_carrier
 
         planner.sync_poses(poses)
@@ -143,6 +143,8 @@ class Simulation:
             husky.pose.a = random.randint(60, 120)
 
             husky.end_effector = "gripper" if id % 2 == 0 else "spike"
+
+            if id == 4: husky.charge = 5
 
 
         # Get the same scatter every time

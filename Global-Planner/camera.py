@@ -155,8 +155,8 @@ class Camera:
             pygame.draw.rect(self._surface, colors.Red, cell_rect, 1)
 
         # Tasks
-        for pose, trash in planner.tasks.unassigned_litter.items():
-            render_position = self._get_render_position(pose.position)
+        for location, type, _ in planner.tasks.unassigned_litter:
+            render_position = self._get_render_position(location)
             pygame.draw.circle(self._surface, colors.DarkRed, render_position, 10, 2)
 
         # Lanes
@@ -170,14 +170,14 @@ class Camera:
         # Robots
         for id, robot in planner.robots.items():
             # The planner's robot pose is relative to the carrier; transform back to global coordinates to draw
-            robot_pose_absolute = tf.absolute(carrier.pose, robot.pose)
+            robot_pose_absolute = tf.absolute_pose(carrier.pose, robot.pose)
             if not self._visible_world_rect.collidepoint(robot_pose_absolute.x, robot_pose_absolute.y): continue
 
             robot_render_position = self._get_render_position(robot_pose_absolute.position)
             pygame.draw.circle(self._surface, colors.HotPink, robot_render_position, 3)
 
-            if robot.target is not None:
-                target_render_position = self._get_render_position(robot.target.position)
+            if len(robot.todo) > 0:
+                target_render_position = self._get_render_position(robot.todo[0].location)
                 pygame.draw.line(self._surface, colors.LightSeaGreen, robot_render_position, target_render_position, 3)
 
     # Rendering

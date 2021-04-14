@@ -1,6 +1,6 @@
 {
     "simulation_settings": {
-        "n_robots": 2,
+        "n_robots": 20,
         "carrier_speed_mph": 0
     },
 

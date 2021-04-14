@@ -1,18 +1,20 @@
 import cmd
 import debug
-import math
 import pose
 import tf
+import util
 
 class Task:
     def __init__(self, location):
         self.location = location
 
-class Pick(Task):
-    def __init__(self, location, type, certainty):
-        super(Pick, self).__init__(location)
+    def __str__(self): return f"{type(self)}{self.location}"
+    def __repr__(self): return f"{type(self)}{self.location}"
+
+class Retrieve(Task):
+    def __init__(self, location, type):
+        super(Retrieve, self).__init__(location)
         self.type = type
-        self.certainty = certainty
 
 class Charge(Task):
     def __init__(self):
@@ -22,72 +24,87 @@ class EmptyBin(Task):
     def __init__(self):
         super(EmptyBin, self).__init__((0, 0))
 
-class Scan(Task):
+class Explore(Task):
     def __init__(self, location):
-        super(Scan, self).__init__(location)
+        super(Explore, self).__init__(location)
 
 class CarrierQueue:
     def __init__(self, map, flow):
         self.map = map
         self.flow = flow
 
-        self.unassigned_litter = {}
+        self.unassigned_litter = []
         self.assignments = {}
 
-
-    def create_retrieval_tasks(self, robot_pose, litter):
+    def update(self, robot_pose, litter):
         for trash in litter:
-            trash_pose_relative, type, certainty = trash
-            trash_pose_absolute = tf.absolute(robot_pose, trash_pose_relative)
+            trash_position_relative, type, certainty = trash
+            location = tf.absolute_position(robot_pose, trash_position_relative)
 
-            if trash_pose_absolute.position not in self.unassigned_litter and certainty > 0.5:
-                self.unassigned_litter[trash_pose_absolute] = (type, certainty, ["gripper"])
+            if certainty < 0.5: continue
+
+            already_known = False
+            for existing in self.unassigned_litter:
+                if util.distance(existing[0], location) < 10:
+                    already_known = True
+                    break
+
+            if not already_known:
+                self.unassigned_litter.append((location, type, ["gripper"]))
 
     def allocate(self, robots):
-        assignments = {}
-
         # Check to see if robot needs to return for service
         for id, robot in robots.items():
             # create a service task
-            if robot.charge <= 25: assignments[id] = Charge()
-            if robot.bin >= 8: assignments[id] = EmptyBin()
+            if robot.charge <= 25:
+                robot.todo.insert(0, Charge())
+                robot.commands.clear()
+
+            if robot.bin >= 8:
+                robot.todo.insert(0, EmptyBin())
+                robot.commands.clear()
 
         # assign retrieval tasks to Robots
-        for where, data in self.unassigned_litter.items():
-            type, certainty, skills = data
+        assigned_litter = []
+
+        for trash in self.unassigned_litter:
+            location, type, skills = trash
 
             # match litter skill to robot skill distance to litter used for tie breaker
-            matches = [id for id, robot in robots.items() if robot.end_effector in skills and id not in assignments]
+            matches = [robot for id, robot in robots.items() if robot.end_effector in skills and len(robot.todo) < 3]
 
             if len(matches) == 0:
                 # need to flag this item. Keep in a list?
                 # print(f"Litter ({type}, {certainty}) cannot be retrieved from {where.position}; needs {skills} to pick up and no robots currently match.")
-                continue
+                break
 
             elif len(matches) == 1:
-                assignments[matches[0]] = Pick(where, type, certainty)
+                matches[0].todo.append(Retrieve(location, type))
+                assigned_litter.append(trash)
                 continue
 
             else:
                 min_distance = 9999
-                closest_robot_id = None
-                for id in matches:
-                    robot = robots[id]
+                closest_robot = None
 
-                    distance = math.sqrt((where[0] - robot.pose.x) ** 2 + (where.y - robot.pose.y) ** 2)
+                for match in matches:
+                    distance = match.pose.distance(location)
                     if distance <= min_distance:
                         min_distance = distance
-                        closest_robot_id = id
+                        closest_robot = match
 
-                assignments[closest_robot_id] = Pick(where, type, certainty)
+                if closest_robot is not None:
+                    closest_robot.todo.append(Retrieve(location, type))
+                    assigned_litter.append(trash)
 
-        for _, task in assignments.items():
-            if isinstance(task, Pick): del self.unassigned_litter[task.location]
+        for trash in assigned_litter:
+            self.unassigned_litter.remove(trash)
 
         # assign explore task to any robots not already allocated
+        assigned_points = []
+
         for id, robot in robots.items():
-            if id in assignments: continue
-            if len(robot.commands) > 0: continue
+            if len(robot.todo) > 0: continue
 
             max_distance = 0
             farthest_point = None
@@ -96,21 +113,22 @@ class CarrierQueue:
                 px = col * self.map.resolution + self.map.resolution / 2
                 py = row * self.map.resolution + self.map.resolution / 2
 
-                distance = math.sqrt((px - robot.pose.x) ** 2 + (py - robot.pose.y) ** 2)
+                if (px, py) in assigned_points: continue
+
+                distance = robot.pose.distance((px, py))
                 if distance >= max_distance:
                     max_distance = distance
                     farthest_point = (px, py)
 
             if farthest_point is not None:
-                assignments[id] = Scan(pose.Pose2D(farthest_point[0], farthest_point[1], 0))
-
-        return assignments
+                robot.todo.append(Explore(farthest_point))
+                assigned_points.append(farthest_point)
 
 class Map:
     def __init__(self, resolution):
         self.resolution = resolution
         self.area = {}
-        self.frontier = []
+        self.frontier = set()
 
     # Update
     def expand(self, robot_pose, robot_grid):
@@ -145,8 +163,9 @@ class Map:
         for candidate in frontier_candidates:
             neighbors = self.get_all_neighbors(candidate)
             if len(neighbors) < 8:
-                self.frontier.append(candidate)
+                self.frontier.add(candidate)
 
+    # Util
     def nearest(self, x, y):
         return (
             int(y / self.resolution),
@@ -175,12 +194,11 @@ class Map:
 class Robot:
     def __init__(self, pose):
         self.pose = pose
-
         self.bin = 0
-        self.commands = []
         self.charge = 100
+        self.todo = []
+        self.commands = []
         self.end_effector = None
-        self.target = None
 
 class LanesFlow:
     def __init__(self, map):
@@ -199,48 +217,21 @@ class LanesFlow:
         return start.x + goal.x + start.y + goal.y
 
     def plan(self, start, goal):
-        start_lane = self._get_lane(start.x)
-        goal_lane = self._get_lane(goal.x)
+        # TODO: Use the map
+        aligned_with_lane = pose.Pose2D(start.x, start.y, 90)
 
-        aligned_to_lane = pose.Pose2D(start.x, start.y, 90)
+        move_up_lane = []
+        for y in range(int(start.y), int(goal.y), 2000):
+            move_up_lane.append(pose.Pose2D(start.x, y, 90))
 
-        if start_lane == goal_lane:
-            return [start, aligned_to_lane, goal]
+        finish_vertical = pose.Pose2D(start.x, goal.y, 90)
 
-        partial_ys = range(int(start.y), int(goal.y), 2000)
-        vertical_poses = [pose.Pose2D(start.x, y, 90) for y in partial_ys]
+        face_destination_orientation = 0 if goal.x > start.x else 180
+        face_destination = pose.Pose2D(start.x, goal.y, face_destination_orientation)
+        cross_lanes = [pose.Pose2D(x, goal.y, face_destination_orientation) for x, _ in self.spans if min(start.x, goal.x) < x < max(start.x, goal.x)]
 
-        angle = 0 if goal.x > start.x else 180
+        return [start, aligned_with_lane] + move_up_lane + [finish_vertical, face_destination] + cross_lanes + [goal]
 
-        ready_to_merge = [
-            pose.Pose2D(start.x, goal.y, 90),
-            pose.Pose2D(start.x, goal.y, angle)
-        ]
-
-        merge_xs = [x for x, _ in self.spans if start_lane[0] < x <= goal_lane[0]]
-        merge_poses = [pose.Pose2D(x, goal.y, angle) for x in merge_xs]
-
-        return [start, aligned_to_lane] + vertical_poses + ready_to_merge + merge_poses + [goal]
-
-class RandomFlow:
-    def __init__(self, map):
-        self.map = map
-
-    def distance(self, start, goal):
-        return start.distance(goal)
-
-    def plan(self, start, goal):
-        start_cell = self.map.nearest(start.x, start.y)
-        goal_cell = self.map.nearest(goal.x, goal.y)
-
-        visited = set(); queue = set(start_cell)
-        while len(queue) > 0:
-            current = queue.pop()
-            if current == goal_cell:
-                return None
-
-            queue.update(self.map.get_cardinal_neighbors(current))
-            queue.difference_update(visited)
 
 class GlobalPlanner:
     def __init__(self):
@@ -261,8 +252,9 @@ class GlobalPlanner:
 
         robot.charge = charge
         robot.end_effector = end_effector
+
         self.map.expand(robot.pose, grid)
-        self.tasks.create_retrieval_tasks(robot.pose, litter)
+        self.tasks.update(robot.pose, litter)
 
         if report is not None:
             if len(robot.commands) == 0: return
@@ -273,23 +265,27 @@ class GlobalPlanner:
                 robot.commands.clear()
 
             elif done:
-                debug.log(f"{id} finished {robot.commands[0]}")
                 robot.commands.pop(0)
+                if len(robot.commands) == 0: robot.todo.pop(0)
 
     # Run
     def get(self):
         plan = {}
 
-        assignments = self.tasks.allocate(self.robots)
-        print(assignments)
+        self.tasks.allocate(self.robots)
+        for id, robot in self.robots.items():
+            print(id, robot.todo)
 
         for id, robot in self.robots.items():
-            if id in assignments:
-                robot.target = assignments[id].location
-                waypoints = self.flow.plan(robot.pose, robot.target)
+            if len(robot.commands) == 0 and len(robot.todo) > 0:
+                next_task = robot.todo[0]
+
+                goal = pose.Pose2D(*next_task.location, 0)
+                waypoints = self.flow.plan(robot.pose, goal)
+
                 start = waypoints.pop(0)
                 for waypoint_absolute in waypoints:
-                    waypoint_relative = tf.relative(start, waypoint_absolute)
+                    waypoint_relative = tf.relative_pose(start, waypoint_absolute)
 
                     if waypoint_relative.a != 0:
                         robot.commands.append(cmd.Command("Rotate", waypoint_relative.a))
@@ -298,8 +294,6 @@ class GlobalPlanner:
                         robot.commands.append(cmd.Command("Move", waypoint_relative.position))
 
                     start = waypoint_absolute
-
-                print(id, robot.commands)
 
             if len(robot.commands) > 0:
                 if robot.commands[0].state == cmd.Queued:

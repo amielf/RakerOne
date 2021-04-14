@@ -8,9 +8,9 @@ class Pose2D:
         self.x = x; self.y = y
         self.a = a
 
-    def distance(self, pose):
-        dx = pose.x - self.x
-        dy = pose.y - self.y
+    def distance(self, position):
+        dx = position[0] - self.x
+        dy = position[1] - self.y
         return math.hypot(dx, dy)
 
     def __str__(self): return f"Pose2D({self.x}, {self.y}, {self.a})"

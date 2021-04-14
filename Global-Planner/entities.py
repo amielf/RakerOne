@@ -72,19 +72,21 @@ class Husky(Entity):
     def get_visible_litter(self, all_litter):
         visible_litter = []
         for trash in all_litter:
-            if self.pose.distance(trash.pose) < self.yolo_range:
-                pose_relative_to_robot = tf.relative(self.pose, trash.pose)
+            if self.pose.distance(trash.pose.position) < self.yolo_range:
+                pose_relative_to_robot = tf.relative_pose(self.pose, trash.pose)
 
                 angle = math.degrees(math.atan2(pose_relative_to_robot.y, pose_relative_to_robot.x))
                 if not (-self._half_yolo_arc <= angle <= self._half_yolo_arc):
                     continue
 
-                pose_relative_to_robot.x = int(pose_relative_to_robot.x)
-                pose_relative_to_robot.y = int(pose_relative_to_robot.y)
+                location = (
+                    int(pose_relative_to_robot.x),
+                    int(pose_relative_to_robot.y)
+                )
 
                 visible_litter.append(
                     (
-                        pose_relative_to_robot,
+                        location,
                         trash.type,
                         trash.certainty
                     )
