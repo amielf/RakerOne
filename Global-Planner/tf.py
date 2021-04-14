@@ -28,7 +28,7 @@ def relative(frame, absolute_pose):
     cos = math.cos(rad); sin = math.sin(rad)
 
     return pose.Pose2D(
-        dx * cos - dy * sin,
-        dx * sin + dy * cos,
+        int(dx * cos - dy * sin),
+        int(dx * sin + dy * cos),
         da
     )

@@ -64,7 +64,9 @@ class Simulation:
             i + 1: entities.Husky(
                 robot_settings["full_charge_v"],
                 robot_settings["lidar_range_mm"],
-                robot_settings["yolo_range_mm"]
+                robot_settings["lidar_arc_deg"],
+                robot_settings["yolo_range_mm"],
+                robot_settings["yolo_arc_deg"]
             )
 
             for i in range(simulation_settings["n_robots"])
@@ -110,8 +112,8 @@ class Simulation:
 
     def _sync_poses(self, planner):
         poses = {}
-        for id, robot in self._huskies.items():
-            pose_relative_to_carrier = tf.relative(self._carrier.pose, robot.pose)
+        for id, husky in self._huskies.items():
+            pose_relative_to_carrier = tf.relative(self._carrier.pose, husky.pose)
             poses[id] = pose_relative_to_carrier
 
         planner.sync_poses(poses)
@@ -129,14 +131,22 @@ class Simulation:
             if husky.action is not None:
                 report = (husky.action.done, husky.action.failed, husky.action.payload)
 
-            planner.sync_robot(id, charge, grid, litter, report)
+                if husky.action.done: husky.action = None
+
+            planner.sync_robot(id, charge, husky.end_effector, grid, litter, report)
 
     # Run
     def run(self, planner):
-        for id, robot in self._huskies.items():
-            robot.pose.x = 2000 * id
-            robot.pose.y = -500
-            robot.pose.a = random.randint(60, 120)
+        for id, husky in self._huskies.items():
+            husky.pose.x = 750 + 1500 * (id - 1)
+            husky.pose.y = -1000
+            husky.pose.a = random.randint(60, 120)
+
+            husky.end_effector = "gripper" if id % 2 == 0 else "spike"
+
+
+        # Get the same scatter every time
+        random.seed(0)
 
         padding = 2000
         for trash in self._litter:
@@ -157,8 +167,8 @@ class Simulation:
 
                 self._update_plan_timer.tick(dt, planner)
 
-                for id, robot in self._huskies.items():
-                    robot.update(dt)
+                for id, husky in self._huskies.items():
+                    husky.update(dt)
 
                 self._sync_poses_timer.tick(dt, planner)
                 self._sync_robots_timer.tick(dt, planner)

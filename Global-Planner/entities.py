@@ -1,4 +1,6 @@
 import abc
+import math
+
 import actions
 import pose
 import pygame
@@ -17,7 +19,7 @@ class Carrier(Entity):
         self.speed = speed
 
 class Husky(Entity):
-    def __init__(self, full_charge, lidar_range, yolo_range):
+    def __init__(self, full_charge, lidar_range, lidar_arc, yolo_range, yolo_arc):
         super(Husky, self).__init__()
         self.dimensions.update(990, 660)
 
@@ -27,7 +29,14 @@ class Husky(Entity):
         self.full_charge = full_charge
 
         self.lidar_range = lidar_range
+        self.lidar_arc = lidar_arc
+
         self.yolo_range = yolo_range
+        self.yolo_arc = yolo_arc
+
+        self._half_yolo_arc = self.yolo_arc / 2
+
+        self.end_effector = None
 
     # Actions
     def execute(self, command):
@@ -63,9 +72,16 @@ class Husky(Entity):
     def get_visible_litter(self, all_litter):
         visible_litter = []
         for trash in all_litter:
-            # TODO: Implement true camera visibility shape
             if self.pose.distance(trash.pose) < self.yolo_range:
                 pose_relative_to_robot = tf.relative(self.pose, trash.pose)
+
+                angle = math.degrees(math.atan2(pose_relative_to_robot.y, pose_relative_to_robot.x))
+                if not (-self._half_yolo_arc <= angle <= self._half_yolo_arc):
+                    continue
+
+                pose_relative_to_robot.x = int(pose_relative_to_robot.x)
+                pose_relative_to_robot.y = int(pose_relative_to_robot.y)
+
                 visible_litter.append(
                     (
                         pose_relative_to_robot,

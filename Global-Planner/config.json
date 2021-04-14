@@ -1,6 +1,6 @@
 {
     "simulation_settings": {
-        "n_robots": 3,
+        "n_robots": 2,
         "carrier_speed_mph": 0
     },
 
@@ -17,8 +17,12 @@
 
     "robot_settings": {
         "full_charge_v": 24,
-        "lidar_range_mm": 2500,
+
+        "lidar_range_mm": 5000,
+        "lidar_arc_deg": 180,
         "lidar_resolution_mm": 1000,
-        "yolo_range_mm": 1000
+
+        "yolo_range_mm": 2134,
+        "yolo_arc_deg": 180
     }
 }

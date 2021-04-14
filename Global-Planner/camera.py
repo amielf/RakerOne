@@ -16,6 +16,7 @@ class Camera:
         events.handle(pygame.MOUSEMOTION, self._on_drag)
         events.handle(pygame.MOUSEBUTTONUP, self._on_release)
         events.handle(pygame.MOUSEWHEEL, self._on_scroll)
+        events.handle(pygame.KEYDOWN, self._on_keydown)
 
         self._last_mouse_position = None
         self._offset = pygame.Vector2(0, self._surface.get_height())
@@ -43,6 +44,19 @@ class Camera:
         self._pause_image = pygame.image.load("pause.png")
         self._pause_image = pygame.transform.scale(self._pause_image, (64, 64))
 
+        self._show_lidar = False
+        self._show_yolo = False
+
+        self._help_lines = [
+            "Simulation:",
+            "P - Toggle Pause",
+            "",
+            "Visualization:",
+            "L - Toggle LIDAR visibility",
+            "Y - Toggle YOLO visibility"
+        ]
+        self._help_lines.reverse()
+
     # Event Handlers
     def _on_click(self, event):
         if event.button == 1:
@@ -66,6 +80,10 @@ class Camera:
         elif self._zoom_bounds[1] < self._zoom: self._zoom = self._zoom_bounds[1]
 
         self._visible_world_rect = None
+
+    def _on_keydown(self, event):
+        if event.key == pygame.K_l: self._show_lidar = not self._show_lidar
+        if event.key == pygame.K_y: self._show_yolo = not self._show_yolo
 
     # Drawing
     def _draw_world(self, world):
@@ -123,6 +141,45 @@ class Camera:
 
             self._surface.blit(frame_image, frame_image.get_rect(center = pose_render_position))
 
+    def _draw_planner_info(self, world, carrier, planner):
+        # Map
+        cell_render_size = self._get_render_dimensions((world.resolution, world.resolution))
+        cell_rect = pygame.Rect(0, 0, *cell_render_size)
+
+        for row, col in planner.map.area:
+            cell_rect.bottomleft = self._get_render_position((col * world.resolution, row * world.resolution))
+            pygame.draw.rect(self._surface, colors.LightGray, cell_rect, 1)
+
+        for row, col in planner.map.frontier:
+            cell_rect.bottomleft = self._get_render_position((col * world.resolution, row * world.resolution))
+            pygame.draw.rect(self._surface, colors.Red, cell_rect, 1)
+
+        # Tasks
+        for pose, trash in planner.tasks.unassigned_litter.items():
+            render_position = self._get_render_position(pose.position)
+            pygame.draw.circle(self._surface, colors.DarkRed, render_position, 10, 2)
+
+        # Lanes
+        for low, high in planner.flow.spans:
+            render_low, _ = self._get_render_position((low, 0))
+            render_high, _ = self._get_render_position((high, 0))
+
+            pygame.draw.line(self._surface, colors.Black, (render_low, self._surface.get_height()), (render_low, 0), 1)
+            pygame.draw.line(self._surface, colors.Black, (render_high, self._surface.get_height()), (render_high, 0), 1)
+
+        # Robots
+        for id, robot in planner.robots.items():
+            # The planner's robot pose is relative to the carrier; transform back to global coordinates to draw
+            robot_pose_absolute = tf.absolute(carrier.pose, robot.pose)
+            if not self._visible_world_rect.collidepoint(robot_pose_absolute.x, robot_pose_absolute.y): continue
+
+            robot_render_position = self._get_render_position(robot_pose_absolute.position)
+            pygame.draw.circle(self._surface, colors.HotPink, robot_render_position, 3)
+
+            if robot.target is not None:
+                target_render_position = self._get_render_position(robot.target.position)
+                pygame.draw.line(self._surface, colors.LightSeaGreen, robot_render_position, target_render_position, 3)
+
     # Rendering
     def _get_render_position(self, world_position):
         relative_x = world_position[0] - self._visible_world_rect.left
@@ -161,7 +218,7 @@ class Camera:
             )
 
         # World
-        #self._draw_world(world)
+        # self._draw_world(world)
 
         # Litter
         for trash in litter:
@@ -177,43 +234,53 @@ class Camera:
 
             self._draw_entity(husky, husky_image)
 
-            # husky_render_position = self._get_render_position(husky.pose.position)
-            # lidar_radius, yolo_radius = self._get_render_dimensions((husky.lidar_range, husky.yolo_range))
-            # pygame.draw.circle(self._surface, (112, 146, 190), husky_render_position, lidar_radius, 2)
-            # pygame.draw.circle(self._surface, (63, 72, 204), husky_render_position, yolo_radius, 2)
+            husky_render_position = self._get_render_position(husky.pose.position)
+
+            if self._show_lidar:
+                lidar_radius, _ = self._get_render_dimensions((husky.lidar_range, 0))
+
+                lidar_arc_points = []
+                half_arc = husky.lidar_arc // 2
+
+                for a in range(int(-half_arc + husky.pose.a), int(husky.pose.a + half_arc)):
+                    rad = -math.radians(a)
+                    lidar_arc_points.append((
+                        husky_render_position[0] + lidar_radius * math.cos(rad),
+                        husky_render_position[1] + lidar_radius * math.sin(rad)
+                    ))
+
+                lidar_arc_points.append(husky_render_position)
+
+                pygame.draw.polygon(self._surface, (112, 146, 190), lidar_arc_points, 2)
+
+            if self._show_yolo:
+                yolo_radius, _ = self._get_render_dimensions((husky.yolo_range, 0))
+
+                yolo_arc_points = []
+                half_arc = husky.lidar_arc // 2
+
+                for a in range(int(-half_arc + husky.pose.a), int(husky.pose.a + half_arc)):
+                    rad = -math.radians(a)
+                    yolo_arc_points.append((
+                        husky_render_position[0] + yolo_radius * math.cos(rad),
+                        husky_render_position[1] + yolo_radius * math.sin(rad)
+                    ))
+
+                yolo_arc_points.append(husky_render_position)
+
+                pygame.draw.polygon(self._surface, (63, 72, 204), yolo_arc_points, 2)
 
         # Carrier
-        self._draw_entity(carrier, self._bus_image, draw_frame = True, pose_offset = (-carrier.dimensions[0] / 2, 0))
+        # self._draw_entity(carrier, self._bus_image, draw_frame = True, pose_offset = (-carrier.dimensions[0] / 2, 0))
 
-        # Poses
-        for id, robot in planner.robots.items():
-            # The planner's robot pose is relative to the carrier; transform back to global coordinates to draw
-            robot_pose_absolute = tf.absolute(carrier.pose, robot.pose)
-            if not self._visible_world_rect.collidepoint(robot_pose_absolute.x, robot_pose_absolute.y): continue
-
-            robot_render_position = self._get_render_position(robot_pose_absolute.position)
-            pygame.draw.circle(self._surface, colors.HotPink, robot_render_position, 3)
-
-        # Map
-        cell_render_size = self._get_render_dimensions((world.resolution, world.resolution))
-        cell_rect = pygame.Rect(0, 0, *cell_render_size)
-
-        for row, col in planner.map.area:
-            cell_rect.bottomleft = self._get_render_position((col * world.resolution, row * world.resolution))
-            pygame.draw.rect(self._surface, colors.LightGray, cell_rect, 1)
-
-        for row, col in planner.map.frontier:
-            cell_rect.bottomleft = self._get_render_position((col * world.resolution, row * world.resolution))
-            pygame.draw.rect(self._surface, colors.Red, cell_rect, 1)
-
-        # Tasks
-        for location, trash in planner.tasks.retrieval_tasks.items():
-            render_position = self._get_render_position(location)
-            pygame.draw.circle(self._surface, colors.DarkRed, render_position, 10, 2)
-
-        for location in planner.tasks.explore_tasks:
-            render_position = self._get_render_position(location)
-            pygame.draw.circle(self._surface, colors.MidnightBlue, render_position, 10, 2)
+        self._draw_planner_info(world, carrier, planner)
 
         if paused:
             self._surface.blit(self._pause_image, self._pause_image.get_rect(topleft = (10, 10)))
+
+        # Help Text
+        y = self._surface.get_height()
+        for line in self._help_lines:
+            text = self._font.render(line, True, colors.Gray)
+            self._surface.blit(text, text.get_rect(bottomleft = (20, y)))
+            y -= text.get_height()

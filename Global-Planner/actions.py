@@ -17,7 +17,7 @@ class Rotate(Action):
         self._w = 36 / 1000.0   # deg/ms
 
     def run(self, dt, robot):
-        da = min(self._w * dt, self.theta)
+        da = min(self._w * dt, abs(self.theta))
         da = math.copysign(da, self.theta)
         self.theta -= da
         robot.pose.a += da
