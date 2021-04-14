@@ -1,7 +1,19 @@
 {
     "simulation_settings": {
-        "n_robots": 20,
+        "n_robots": 10,
+        "n_trash": 100,
         "carrier_speed_mph": 0
+    },
+
+    "trash_settings": {
+        "bottle": {
+            "percentage": 90,
+            "certainty": [0.7, 0.99]
+        },
+        "paper_bag": {
+            "percentage": 10,
+            "certainty": [0.3, 0.72]
+        }
     },
 
     "interval_settings": {

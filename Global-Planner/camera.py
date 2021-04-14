@@ -29,10 +29,6 @@ class Camera:
         self._bus_image = pygame.image.load("bus.png")
         self._husky_image = pygame.image.load("husky.png")
 
-        self._trash_image = pygame.Surface((50, 50))
-        self._trash_image.set_colorkey(colors.Black)
-        pygame.draw.circle(self._trash_image, colors.OrangeRed, (25, 25), 25)
-
         self._frame_image = pygame.Surface((50, 50))
         self._frame_image.set_colorkey(colors.Black)
         pygame.draw.line(self._frame_image, colors.Firebrick, (25, 25), (50, 25), 2)
@@ -46,6 +42,7 @@ class Camera:
 
         self._show_lidar = False
         self._show_yolo = False
+        self._show_tasks = False
 
         self._help_lines = [
             "Simulation:",
@@ -53,7 +50,8 @@ class Camera:
             "",
             "Visualization:",
             "L - Toggle LIDAR visibility",
-            "Y - Toggle YOLO visibility"
+            "Y - Toggle YOLO visibility",
+            "T - Toggle tasks visibility"
         ]
         self._help_lines.reverse()
 
@@ -84,6 +82,7 @@ class Camera:
     def _on_keydown(self, event):
         if event.key == pygame.K_l: self._show_lidar = not self._show_lidar
         if event.key == pygame.K_y: self._show_yolo = not self._show_yolo
+        if event.key == pygame.K_t: self._show_tasks = not self._show_tasks
 
     # Drawing
     def _draw_world(self, world):
@@ -176,7 +175,7 @@ class Camera:
             robot_render_position = self._get_render_position(robot_pose_absolute.position)
             pygame.draw.circle(self._surface, colors.HotPink, robot_render_position, 3)
 
-            if len(robot.todo) > 0:
+            if self._show_tasks and len(robot.todo) > 0:
                 target_render_position = self._get_render_position(robot.todo[0].location)
                 pygame.draw.line(self._surface, colors.LightSeaGreen, robot_render_position, target_render_position, 3)
 
@@ -222,7 +221,12 @@ class Camera:
 
         # Litter
         for trash in litter:
-            self._draw_entity(trash, self._trash_image)
+            if not self._visible_world_rect.collidepoint(trash.pose.position): continue
+
+            render_position = self._get_render_position(trash.pose.position)
+            radius, _ = self._get_render_dimensions((50, 0))
+            color = colors.LightSteelBlue if trash.type == "bottle" else colors.SaddleBrown if trash.type == "paper_bag" else colors.Black
+            pygame.draw.circle(self._surface, color, render_position, radius)
 
         # Huskies
         for id, husky in huskies.items():

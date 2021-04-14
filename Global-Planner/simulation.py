@@ -46,6 +46,7 @@ class Simulation:
             config = json.load(file)
 
         simulation_settings = config["simulation_settings"]
+        trash_settings = config["trash_settings"]
         interval_settings = config["interval_settings"]
         world_settings = config["world_settings"]
         robot_settings = config["robot_settings"]
@@ -72,10 +73,17 @@ class Simulation:
             for i in range(simulation_settings["n_robots"])
         }
 
-        self._litter = [
-            entities.Trash("bottle", 0.99)
-            for _ in range(500)
-        ]
+        hat = []
+        for type, data in trash_settings.items():
+            hat.extend(type for _ in range(data["percentage"]))
+
+        assert len(hat) == 100, f"Trash percentages add up to more that 100%"
+
+        self._litter = []
+        for _ in range(simulation_settings["n_trash"]):
+            type = random.choice(hat)
+            certainty = random.uniform(*trash_settings[type]["certainty"])
+            self._litter.append(entities.Trash(type, certainty))
 
         self._update_plan_timer = _IntervalTimer(interval_settings["update_plan_interval_ms"], self._update_plan)
         self._sync_poses_timer = _IntervalTimer(interval_settings["sync_poses_interval_ms"], self._sync_poses)
