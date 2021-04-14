@@ -154,8 +154,8 @@ class Camera:
             pygame.draw.rect(self._surface, colors.Red, cell_rect, 1)
 
         # Tasks
-        for location, type, _ in planner.tasks.unassigned_litter:
-            render_position = self._get_render_position(location)
+        for task in planner.tasks.retrieve_tasks:
+            render_position = self._get_render_position(task.location)
             pygame.draw.circle(self._surface, colors.DarkRed, render_position, 10, 2)
 
         # Lanes

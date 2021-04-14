@@ -64,6 +64,7 @@ class Simulation:
         self._huskies = {
             i + 1: entities.Husky(
                 robot_settings["full_charge_v"],
+                robot_settings["bin_capacity_kg"],
                 robot_settings["lidar_range_mm"],
                 robot_settings["lidar_arc_deg"],
                 robot_settings["yolo_range_mm"],
@@ -82,8 +83,9 @@ class Simulation:
         self._litter = []
         for _ in range(simulation_settings["n_trash"]):
             type = random.choice(hat)
+            weight = trash_settings[type]["weight_kg"]
             certainty = random.uniform(*trash_settings[type]["certainty"])
-            self._litter.append(entities.Trash(type, certainty))
+            self._litter.append(entities.Trash(type, weight, certainty))
 
         self._update_plan_timer = _IntervalTimer(interval_settings["update_plan_interval_ms"], self._update_plan)
         self._sync_poses_timer = _IntervalTimer(interval_settings["sync_poses_interval_ms"], self._sync_poses)

@@ -19,7 +19,7 @@ class Carrier(Entity):
         self.speed = speed
 
 class Husky(Entity):
-    def __init__(self, full_charge, lidar_range, lidar_arc, yolo_range, yolo_arc):
+    def __init__(self, full_charge, bin_capacity, lidar_range, lidar_arc, yolo_range, yolo_arc):
         super(Husky, self).__init__()
         self.dimensions.update(990, 660)
 
@@ -27,6 +27,9 @@ class Husky(Entity):
 
         self.charge = full_charge
         self.full_charge = full_charge
+
+        self.bin = 0
+        self.bin_capacity = bin_capacity
 
         self.lidar_range = lidar_range
         self.lidar_arc = lidar_arc
@@ -88,6 +91,7 @@ class Husky(Entity):
                     (
                         location,
                         trash.type,
+                        trash.weight,
                         trash.certainty
                     )
                 )
@@ -95,9 +99,10 @@ class Husky(Entity):
         return visible_litter
 
 class Trash(Entity):
-    def __init__(self, type, certainty):
+    def __init__(self, type, weight, certainty):
         super(Trash, self).__init__()
         self.dimensions.update(100, 100)
 
         self.type = type
+        self.weight = weight
         self.certainty = certainty

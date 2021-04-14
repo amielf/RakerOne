@@ -51,8 +51,21 @@ class Move(Action):
         if self._face_destination.done and self.distance == 0:
             self.done = True
 
+class EndEffectorAction(Action):
+    def __init__(self, weight):
+        super(EndEffectorAction, self).__init__()
+        self.weight = weight
+        self.countdown = weight * 10000
+
+    def run(self, dt, robot):
+        self.countdown -= dt
+        if self.countdown <= 0:
+            robot.bin += self.weight
+            self.done = True
+
 def create(command):
     if command.name == "Move": return Move(*command.args)
     if command.name == "Rotate": return Rotate(command.args)
+    if command.name == "Pick": return EndEffectorAction(command.args)
 
     raise Exception(f"{command.name} not recognized.")

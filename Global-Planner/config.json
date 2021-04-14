@@ -8,10 +8,12 @@
     "trash_settings": {
         "bottle": {
             "percentage": 90,
+            "weight_kg": 0.1,
             "certainty": [0.7, 0.99]
         },
         "paper_bag": {
             "percentage": 10,
+            "weight_kg": 0.01,
             "certainty": [0.3, 0.72]
         }
     },
@@ -29,6 +31,7 @@
 
     "robot_settings": {
         "full_charge_v": 24,
+        "bin_capacity_kg": 0.5,
 
         "lidar_range_mm": 5000,
         "lidar_arc_deg": 180,
