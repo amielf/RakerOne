@@ -1,0 +1,55 @@
+Determining if the pthread_create exist failed with the following output:
+Change Dir: /home/amiel/RakerOne/Base-Navigation/raker_base_ws/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_42d9a/fast"
+/usr/bin/make -f CMakeFiles/cmTC_42d9a.dir/build.make CMakeFiles/cmTC_42d9a.dir/build
+make[1]: Entering directory '/home/amiel/RakerOne/Base-Navigation/raker_base_ws/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_42d9a.dir/CheckSymbolExists.c.o
+/usr/bin/cc    -o CMakeFiles/cmTC_42d9a.dir/CheckSymbolExists.c.o   -c /home/amiel/RakerOne/Base-Navigation/raker_base_ws/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+Linking C executable cmTC_42d9a
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_42d9a.dir/link.txt --verbose=1
+/usr/bin/cc      -rdynamic CMakeFiles/cmTC_42d9a.dir/CheckSymbolExists.c.o  -o cmTC_42d9a 
+CMakeFiles/cmTC_42d9a.dir/CheckSymbolExists.c.o: In function `main':
+CheckSymbolExists.c:(.text+0x1b): undefined reference to `pthread_create'
+collect2: error: ld returned 1 exit status
+CMakeFiles/cmTC_42d9a.dir/build.make:97: recipe for target 'cmTC_42d9a' failed
+make[1]: *** [cmTC_42d9a] Error 1
+make[1]: Leaving directory '/home/amiel/RakerOne/Base-Navigation/raker_base_ws/build/CMakeFiles/CMakeTmp'
+Makefile:126: recipe for target 'cmTC_42d9a/fast' failed
+make: *** [cmTC_42d9a/fast] Error 2
+
+File /home/amiel/RakerOne/Base-Navigation/raker_base_ws/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <pthread.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef pthread_create
+  return ((int*)(&pthread_create))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+
+Determining if the function pthread_create exists in the pthreads failed with the following output:
+Change Dir: /home/amiel/RakerOne/Base-Navigation/raker_base_ws/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_a29bc/fast"
+/usr/bin/make -f CMakeFiles/cmTC_a29bc.dir/build.make CMakeFiles/cmTC_a29bc.dir/build
+make[1]: Entering directory '/home/amiel/RakerOne/Base-Navigation/raker_base_ws/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_a29bc.dir/CheckFunctionExists.c.o
+/usr/bin/cc   -DCHECK_FUNCTION_EXISTS=pthread_create   -o CMakeFiles/cmTC_a29bc.dir/CheckFunctionExists.c.o   -c /usr/share/cmake-3.10/Modules/CheckFunctionExists.c
+Linking C executable cmTC_a29bc
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_a29bc.dir/link.txt --verbose=1
+/usr/bin/cc  -DCHECK_FUNCTION_EXISTS=pthread_create    -rdynamic CMakeFiles/cmTC_a29bc.dir/CheckFunctionExists.c.o  -o cmTC_a29bc -lpthreads 
+/usr/bin/ld: cannot find -lpthreads
+collect2: error: ld returned 1 exit status
+CMakeFiles/cmTC_a29bc.dir/build.make:97: recipe for target 'cmTC_a29bc' failed
+make[1]: *** [cmTC_a29bc] Error 1
+make[1]: Leaving directory '/home/amiel/RakerOne/Base-Navigation/raker_base_ws/build/CMakeFiles/CMakeTmp'
+Makefile:126: recipe for target 'cmTC_a29bc/fast' failed
+make: *** [cmTC_a29bc/fast] Error 2
+
+
