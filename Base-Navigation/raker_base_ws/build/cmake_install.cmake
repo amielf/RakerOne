@@ -134,6 +134,7 @@ if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   include("/home/amiel/RakerOne/Base-Navigation/raker_base_ws/build/raker_base_bring_up/cmake_install.cmake")
   include("/home/amiel/RakerOne/Base-Navigation/raker_base_ws/build/raker_laser_assembler/cmake_install.cmake")
   include("/home/amiel/RakerOne/Base-Navigation/raker_base_ws/build/raker_base/cmake_install.cmake")
+  include("/home/amiel/RakerOne/Base-Navigation/raker_base_ws/build/raker_base_tilt/cmake_install.cmake")
   include("/home/amiel/RakerOne/Base-Navigation/raker_base_ws/build/raker_base_description/cmake_install.cmake")
 
 endif()

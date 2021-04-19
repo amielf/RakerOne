@@ -1,0 +1,8 @@
+prefix=/home/amiel/RakerOne/Base-Navigation/raker_base_ws/devel
+
+Name: raker_base_bring_up
+Description: Description of raker_base_bring_up
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

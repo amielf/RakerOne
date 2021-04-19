@@ -1,0 +1,8 @@
+prefix=/home/amiel/RakerOne/Base-Navigation/raker_base_ws/install
+
+Name: raker_base_description
+Description: Description of raker_base_description
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 
