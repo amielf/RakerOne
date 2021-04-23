@@ -1,5 +1,10 @@
 <?xml version="1.0"?>
 <!--
+Modified version of the original gazebo_description.launch file provided by Husky.
+
+
+
+
 Software License Agreement (BSD)
 
 \file      gazebo_description.launch

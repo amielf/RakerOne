@@ -1,8 +1,0 @@
-prefix=/home/amiel/RakerOne/Base-Navigation/raker_base_ws/devel
-
-Name: raker_laser_assembler
-Description: Description of raker_laser_assembler
-Version: 0.0.0
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: 
