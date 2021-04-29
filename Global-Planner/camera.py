@@ -1,7 +1,8 @@
 import colors
 import math
 import pygame
-import tf
+
+import common
 import util
 
 # The dimensions of the Clearpath Husky are 660x990 mm
@@ -35,23 +36,33 @@ class Camera:
         pygame.draw.line(self._frame_image, colors.DodgerBlue, (25, 25), (25, 50), 2)
         self._frame_image = pygame.transform.flip(self._frame_image, False, True)
 
-        self._font = pygame.font.SysFont("Calibri", 24)
+        self._large_font = pygame.font.SysFont("Calibri", 24)
+        self._small_font = pygame.font.SysFont("Calibri", 12)
 
         self._pause_image = pygame.image.load("pause.png")
         self._pause_image = pygame.transform.scale(self._pause_image, (64, 64))
 
+        self._end_effector_images = {
+            "gripper": pygame.image.load("gripper.png"),
+            "spike": pygame.image.load("spike.png")
+        }
+
+        self._show_frames = False
         self._show_lidar = False
-        self._show_yolo = False
         self._show_tasks = False
+        self._show_poses = False
+        self._show_yolo = False
 
         self._help_lines = [
             "Simulation:",
             "P - Toggle Pause",
             "",
             "Visualization:",
+            "F - Toggle frame visibility",
             "L - Toggle LIDAR visibility",
+            "T - Toggle tasks visibility",
+            "W - Toggle poses visibility",
             "Y - Toggle YOLO visibility",
-            "T - Toggle tasks visibility"
         ]
         self._help_lines.reverse()
 
@@ -80,39 +91,13 @@ class Camera:
         self._visible_world_rect = None
 
     def _on_keydown(self, event):
+        if event.key == pygame.K_f: self._show_frames = not self._show_frames
         if event.key == pygame.K_l: self._show_lidar = not self._show_lidar
-        if event.key == pygame.K_y: self._show_yolo = not self._show_yolo
         if event.key == pygame.K_t: self._show_tasks = not self._show_tasks
+        if event.key == pygame.K_w: self._show_poses = not self._show_poses
+        if event.key == pygame.K_y: self._show_yolo = not self._show_yolo
 
     # Drawing
-    def _draw_world(self, world):
-        row_min = max(self._visible_world_rect.top // world.resolution, 0)
-        row_max = math.ceil(self._visible_world_rect.bottom / world.resolution)
-
-        col_min = max(self._visible_world_rect.left // world.resolution, 0)
-        col_max = math.ceil(self._visible_world_rect.right / world.resolution)
-
-        for r in range(row_min, row_max):
-            y = util.clip(0, r * world.resolution, world.height)
-
-            x_min = util.clip(0, self._visible_world_rect.left, world.width)
-            x_max = util.clip(0, self._visible_world_rect.right, world.width)
-
-            start = self._get_render_position((x_min, y))
-            end = self._get_render_position((x_max, y))
-            pygame.draw.line(self._surface, colors.LightGray, start, end, 1)
-
-        for c in range(col_min, col_max):
-            x = util.clip(0, c * world.resolution, world.width)
-
-            # This looks backwards but that's because the rect is defined with +y going down
-            y_min = util.clip(0, self._visible_world_rect.top, world.height)
-            y_max = util.clip(0, self._visible_world_rect.bottom, world.height)
-
-            start = self._get_render_position((x, y_min))
-            end = self._get_render_position((x, y_max))
-            pygame.draw.line(self._surface, colors.LightGray, start, end, 1)
-
     def _draw_entity(self, entity, image, draw_frame = False, pose_offset = (0, 0)):
         footprint = pygame.Rect(
             0,
@@ -120,7 +105,7 @@ class Camera:
             entity.dimensions.x,
             entity.dimensions.y
         )
-        footprint.center = entity.pose.position
+        footprint.center = (entity.pose.x, entity.pose.y)
 
         if not self._visible_world_rect.colliderect(footprint): return
 
@@ -128,8 +113,13 @@ class Camera:
         if entity.pose.a != 0:
             image = pygame.transform.rotate(image, entity.pose.a)
 
-        pose_render_position = self._get_render_position(entity.pose.position)
-        image_render_position = self._get_render_position((entity.pose.x + pose_offset[0], entity.pose.y + pose_offset[1]))
+        pose_render_position = self._get_render_position(entity.pose.location)
+        image_render_position = self._get_render_position(
+            common.Location(
+                entity.pose.x + pose_offset[0],
+                entity.pose.y + pose_offset[1]
+            )
+        )
         self._surface.blit(image, image.get_rect(center = image_render_position))
 
         if draw_frame:
@@ -140,28 +130,44 @@ class Camera:
 
             self._surface.blit(frame_image, frame_image.get_rect(center = pose_render_position))
 
-    def _draw_planner_info(self, world, carrier, planner):
+    def _draw_planner_info(self, origin, planner):
         # Map
-        cell_render_size = self._get_render_dimensions((world.resolution, world.resolution))
+        cell_render_size = self._get_render_dimensions((planner.map.resolution, planner.map.resolution))
         cell_rect = pygame.Rect(0, 0, *cell_render_size)
 
-        for row, col in planner.map.area:
-            cell_rect.bottomleft = self._get_render_position((col * world.resolution, row * world.resolution))
+        for row, col in planner.map.grid:
+            center = origin.get_absolute(planner.map.get_center_location(row, col))
+            cell_rect.center = self._get_render_position(center)
             pygame.draw.rect(self._surface, colors.LightGray, cell_rect, 1)
 
+            # text = self._small_font.render(f"({row}, {col})", True, colors.DarkGray)
+            # self._surface.blit(text, text.get_rect(center = cell_rect.center))
+
         for row, col in planner.map.frontier:
-            cell_rect.bottomleft = self._get_render_position((col * world.resolution, row * world.resolution))
+            center = origin.get_absolute(planner.map.get_center_location(row, col))
+            cell_rect.center = self._get_render_position(center)
             pygame.draw.rect(self._surface, colors.Red, cell_rect, 1)
 
         # Tasks
-        for task in planner.tasks.retrieve_tasks:
-            render_position = self._get_render_position(task.location)
-            pygame.draw.circle(self._surface, colors.DarkRed, render_position, 10, 2)
+        for task in planner.tasks.open_retrieval_tasks.values():
+            location_absolute = origin.get_absolute(task.location)
+            render_position = self._get_render_position(location_absolute)
+            pygame.draw.circle(self._surface, colors.Firebrick, render_position, 10, 2)
+
+        for task in planner.tasks.active_retrieval_tasks.values():
+            location_absolute = origin.get_absolute(task.location)
+            render_position = self._get_render_position(location_absolute)
+            pygame.draw.circle(self._surface, colors.DodgerBlue, render_position, 10, 2)
+
+        for task in planner.tasks.finished_retrieval_tasks.values():
+            location_absolute = origin.get_absolute(task.location)
+            render_position = self._get_render_position(location_absolute)
+            pygame.draw.circle(self._surface, colors.DarkGray, render_position, 10, 2)
 
         # Lanes
         for low, high in planner.flow.spans:
-            render_low, _ = self._get_render_position((low, 0))
-            render_high, _ = self._get_render_position((high, 0))
+            render_low, _ = self._get_render_position(common.Location(low, 0))
+            render_high, _ = self._get_render_position(common.Location(high, 0))
 
             pygame.draw.line(self._surface, colors.Black, (render_low, self._surface.get_height()), (render_low, 0), 1)
             pygame.draw.line(self._surface, colors.Black, (render_high, self._surface.get_height()), (render_high, 0), 1)
@@ -169,20 +175,23 @@ class Camera:
         # Robots
         for id, robot in planner.robots.items():
             # The planner's robot pose is relative to the carrier; transform back to global coordinates to draw
-            robot_pose_absolute = tf.absolute_pose(carrier.pose, robot.pose)
+            robot_pose_absolute = origin.get_absolute(robot.pose)
             if not self._visible_world_rect.collidepoint(robot_pose_absolute.x, robot_pose_absolute.y): continue
 
-            robot_render_position = self._get_render_position(robot_pose_absolute.position)
-            pygame.draw.circle(self._surface, colors.HotPink, robot_render_position, 3)
+            robot_render_position = self._get_render_position(robot_pose_absolute.location)
+
+            if self._show_poses:
+                pygame.draw.circle(self._surface, colors.HotPink, robot_render_position, 3)
 
             if self._show_tasks and len(robot.todo) > 0:
-                target_render_position = self._get_render_position(robot.todo[0].location)
+                location_absolute = origin.get_absolute(robot.todo[0].location)
+                target_render_position = self._get_render_position(location_absolute)
                 pygame.draw.line(self._surface, colors.LightSeaGreen, robot_render_position, target_render_position, 3)
 
     # Rendering
     def _get_render_position(self, world_position):
-        relative_x = world_position[0] - self._visible_world_rect.left
-        relative_y = world_position[1] - self._visible_world_rect.top
+        relative_x = world_position.x - self._visible_world_rect.left
+        relative_y = world_position.y - self._visible_world_rect.top
 
         render_position = (
             int(self._zoom * relative_x // MM_PER_PIXEL),
@@ -197,7 +206,7 @@ class Camera:
         )
         return render_dimensions
 
-    def render(self, planner, world, carrier, huskies, litter, paused):
+    def render(self, planner, carrier, huskies, litter, paused, run_time):
         self._surface.fill(colors.White)
 
         if self._visible_world_rect is None:
@@ -216,29 +225,40 @@ class Camera:
                 (surface_height - self._offset.y) * scale
             )
 
-        # World
-        # self._draw_world(world)
-
         # Litter
-        for trash in litter:
-            if not self._visible_world_rect.collidepoint(trash.pose.position): continue
+        for id, trash in litter.items():
+            if not self._visible_world_rect.collidepoint((trash.pose.x, trash.pose.y)): continue
 
-            render_position = self._get_render_position(trash.pose.position)
+            render_position = self._get_render_position(trash.pose.location)
             radius, _ = self._get_render_dimensions((50, 0))
-            color = colors.LightSteelBlue if trash.type == "bottle" else colors.SaddleBrown if trash.type == "paper_bag" else colors.Black
+
+            color = colors.LightSteelBlue if trash.type == "glass_bottle" \
+                    else colors.SaddleBrown if trash.type == "paper_bag" \
+                    else colors.Orange if trash.type == "cig" \
+                    else colors.Black
+
             pygame.draw.circle(self._surface, color, render_position, radius)
 
         # Huskies
         for id, husky in huskies.items():
             husky_image = self._husky_image.copy()
 
-            text = self._font.render(str(id), True, colors.Gold)
-            text = pygame.transform.rotate(text, -90)
-            husky_image.blit(text, text.get_rect(center = self._husky_image.get_rect().center))
+            # end_effector_image = self._end_effector_images[husky.end_effector]
+            # husky_image.blit(end_effector_image, end_effector_image.get_rect(center = husky_image.get_rect().center))
 
-            self._draw_entity(husky, husky_image)
+            husky_center = self._husky_image.get_rect().center
 
-            husky_render_position = self._get_render_position(husky.pose.position)
+            id_text = self._large_font.render(str(id), True, colors.WhiteSmoke)
+            id_text = pygame.transform.rotate(id_text, -90)
+            husky_image.blit(id_text, id_text.get_rect(center = husky_center))
+
+            end_effector_text = self._small_font.render(husky.end_effector, False, colors.WhiteSmoke)
+            end_effector_text = pygame.transform.rotate(end_effector_text, -90)
+            husky_image.blit(end_effector_text, end_effector_text.get_rect(center = (husky_center[0] - 20, husky_center[1])))
+
+            self._draw_entity(husky, husky_image, draw_frame = self._show_frames)
+
+            husky_render_position = self._get_render_position(husky.pose.location)
 
             if self._show_lidar:
                 lidar_radius, _ = self._get_render_dimensions((husky.lidar_range, 0))
@@ -261,7 +281,7 @@ class Camera:
                 yolo_radius, _ = self._get_render_dimensions((husky.yolo_range, 0))
 
                 yolo_arc_points = []
-                half_arc = husky.lidar_arc // 2
+                half_arc = husky.yolo_arc // 2
 
                 for a in range(int(-half_arc + husky.pose.a), int(husky.pose.a + half_arc)):
                     rad = -math.radians(a)
@@ -275,16 +295,19 @@ class Camera:
                 pygame.draw.polygon(self._surface, (63, 72, 204), yolo_arc_points, 2)
 
         # Carrier
-        # self._draw_entity(carrier, self._bus_image, draw_frame = True, pose_offset = (-carrier.dimensions[0] / 2, 0))
+        self._draw_entity(carrier, self._bus_image, draw_frame = True, pose_offset = (-carrier.dimensions[0] / 2, 0))
 
-        self._draw_planner_info(world, carrier, planner)
+        self._draw_planner_info(carrier.pose, planner)
 
         if paused:
             self._surface.blit(self._pause_image, self._pause_image.get_rect(topleft = (10, 10)))
 
+        run_time_text = self._large_font.render(f"{run_time} ms", False, colors.DarkGray)
+        self._surface.blit(run_time_text, run_time_text.get_rect(right = self._surface.get_width()))
+
         # Help Text
         y = self._surface.get_height()
         for line in self._help_lines:
-            text = self._font.render(line, True, colors.Gray)
-            self._surface.blit(text, text.get_rect(bottomleft = (20, y)))
-            y -= text.get_height()
+            id_text = self._small_font.render(line, True, colors.Gray)
+            self._surface.blit(id_text, id_text.get_rect(bottomleft = (20, y - 20)))
+            y -= id_text.get_height()

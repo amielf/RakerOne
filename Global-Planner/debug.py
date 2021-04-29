@@ -17,7 +17,10 @@ def profiled(fn):
     def wrapper(*args, **kwargs):
         start = time.perf_counter()
         out = fn(*args, **kwargs)
-        if _on: print(f"{fn} took {time.perf_counter() - start} sec")
+
+        ms = (time.perf_counter() - start) * 1000
+        if _on: print(f"{fn} took {ms} ms")
+
         return out
 
     return wrapper

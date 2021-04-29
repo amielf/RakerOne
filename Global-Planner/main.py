@@ -1,11 +1,11 @@
 import debug
-import planner
+import wuc
 import simulation
 
 if __name__ == '__main__':
     debug.on()
 
-    planner = planner.GlobalPlanner()
+    planner = wuc.WorkerUnitCoordinator()
 
     wrapper = simulation.Simulation("config.json")
     # wrapper = ros.RosWrapper(planner)

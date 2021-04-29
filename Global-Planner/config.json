@@ -1,43 +1,60 @@
 {
-    "simulation_settings": {
-        "n_robots": 10,
-        "n_trash": 100,
-        "carrier_speed_mph": 0
+    "simulation": {
+        "n_robots": 9,
+
+        "run_time_ms": 300000,
+
+        "update_plan_interval_ms": 250,
+        "sync_carrier_interval_ms": 100,
+        "sync_poses_interval_ms": 100,
+        "sync_robots_interval_ms": 100
     },
 
-    "trash_settings": {
-        "bottle": {
-            "percentage": 90,
-            "weight_kg": 0.1,
-            "certainty": [0.7, 0.99]
-        },
-        "paper_bag": {
-            "percentage": 10,
-            "weight_kg": 0.01,
-            "certainty": [0.3, 0.72]
-        }
-    },
-
-    "interval_settings": {
-        "update_plan_interval_ms": 1000,
-        "sync_poses_interval_ms": 50,
-        "sync_robots_interval_ms": 50
-    },
-
-    "world_settings": {
+    "terrain": {
         "width_mm": 18288,
-        "height_mm": 3219000
+        "height_mm": 3219000,
+        "resolution_mm": 1000
     },
 
-    "robot_settings": {
+    "carrier": {
+        "speed_mph": 2
+    },
+
+    "robot": {
         "full_charge_v": 24,
-        "bin_capacity_kg": 0.5,
-
-        "lidar_range_mm": 5000,
-        "lidar_arc_deg": 180,
-        "lidar_resolution_mm": 1000,
-
+        "bin_capacity_mm3": 10,
+        "lidar_range_mm": 12000,
+        "lidar_arc_deg": 90,
         "yolo_range_mm": 2134,
-        "yolo_arc_deg": 180
+        "yolo_arc_deg": 180,
+        "linear_speed_mph": 4,
+        "rotational_speed_dps": 90
+    },
+
+    "litter_distribution": {
+        "total": 5000,
+        "types": [
+            {
+                "name": "glass_bottle",
+                "volume_mm3": 5,
+                "certainty": [0.70, 0.99],
+                "end_effectors": ["gripper"],
+                "percentage": 10
+            },
+            {
+                "name": "paper_bag",
+                "volume_mm3": 1,
+                "certainty": [0.30, 0.72],
+                "end_effectors": ["gripper", "spike"],
+                "percentage": 70
+            },
+            {
+                "name": "cig",
+                "volume_mm3": 1,
+                "certainty": [0.50, 0.80],
+                "end_effectors": ["suction"],
+                "percentage": 20
+            }
+        ]
     }
 }
