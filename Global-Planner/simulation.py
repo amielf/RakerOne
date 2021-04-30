@@ -48,7 +48,7 @@ class Simulation:
         with open(config_filename, "r") as file:
             config = json.load(file, object_hook = lambda d: types.SimpleNamespace(**d))
 
-        self._desired_run_time = config.simulation.run_time_ms
+        self._desired_run_time = config.simulation.run_time_sec * 1000
         self._sim_time = 0
 
         self._grid = grid.Grid(
@@ -105,9 +105,10 @@ class Simulation:
 
         self._litter = {}
         self._litter_distribution = config.litter_distribution
+        self._collected_litter = {}
 
         # Camera
-        surface = pygame.display.set_mode((1200, 700))
+        surface = pygame.display.set_mode((700, 900))
         pygame.display.set_caption("Global Planner Simulator")
         self._camera = camera.Camera(surface, self._events)
 
@@ -124,9 +125,9 @@ class Simulation:
 
     # Interval Functions
     def _update_plan(self, planner):
-        commands = planner.get()
-        for id, command in commands.items():
-            self._huskies[id].execute(command)
+        plan = planner.get()
+        for id, commands in plan.items():
+            self._huskies[id].execute(commands)
 
     def _sync_carrier(self, planner):
         vy = self._carrier.speed
@@ -156,18 +157,9 @@ class Simulation:
                     trash = self._litter[trash_id]
                     metrics.discovery_time_by_id[trash_id] = (trash.type, trash.pose.location, self._sim_time)
 
-            report = None
-            if husky.action is not None:
-                report = (husky.action.done, husky.action.failed, husky.action.payload)
+            next_task_please = len(husky.actions) == 0
 
-                if husky.action.done:
-                    if isinstance(husky.action, actions._PickAction):
-                        trash = self._litter[husky.action.trash_id]
-                        metrics.pick_time_by_id[husky.action.trash_id] = (trash.type, trash.pose.location, self._sim_time)
-
-                    husky.action = None
-
-            planner.sync_robot(id, charge, bin, husky.end_effector, grid, litter, report)
+            planner.sync_robot(id, charge, bin, husky.end_effector, grid, litter, next_task_please)
 
     # Run
     def _setup(self):
@@ -210,8 +202,6 @@ class Simulation:
 
     @debug.profiled
     def _step(self, dt, planner):
-        self._sim_time += dt
-
         dy = int(self._carrier.speed * dt)
         self._carrier.pose.y += dy
         self._carrier_dy += dy
@@ -226,10 +216,8 @@ class Simulation:
 
         self._update_plan_timer.tick(dt, planner)
 
-    def _finish(self, planner):
-        metrics.save()
-        print(f"n known tasks: {len(planner.tasks.active_retrieval_tasks) + len(planner.tasks.open_retrieval_tasks)}")
-        print(f"n finished tasks: {len(planner.tasks.finished_retrieval_tasks)}")
+        self._sim_time += dt
+        metrics.collected_trash_by_time.append((self._sim_time, len(planner.tasks.finished_retrieval_tasks)))
 
     def run(self, planner):
         self._setup()
@@ -242,11 +230,11 @@ class Simulation:
             self._events.process(self)
 
             if self._sim_time >= self._desired_run_time:
-                if not self._finished: self._finish(planner)
+                if not self._finished: metrics.save()
                 self._finished = True
 
             if not self._paused and not self._finished:
-                self._step(200, planner)
+                self._step(500, planner)
 
             now = time.perf_counter()
             frame_countdown -= (now - prev) * 1000

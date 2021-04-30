@@ -42,11 +42,6 @@ class Camera:
         self._pause_image = pygame.image.load("pause.png")
         self._pause_image = pygame.transform.scale(self._pause_image, (64, 64))
 
-        self._end_effector_images = {
-            "gripper": pygame.image.load("gripper.png"),
-            "spike": pygame.image.load("spike.png")
-        }
-
         self._show_frames = False
         self._show_lidar = False
         self._show_tasks = False
@@ -152,12 +147,12 @@ class Camera:
         for task in planner.tasks.open_retrieval_tasks.values():
             location_absolute = origin.get_absolute(task.location)
             render_position = self._get_render_position(location_absolute)
-            pygame.draw.circle(self._surface, colors.Firebrick, render_position, 10, 2)
+            pygame.draw.circle(self._surface, colors.Coral, render_position, 10, 2)
 
         for task in planner.tasks.active_retrieval_tasks.values():
             location_absolute = origin.get_absolute(task.location)
             render_position = self._get_render_position(location_absolute)
-            pygame.draw.circle(self._surface, colors.DodgerBlue, render_position, 10, 2)
+            pygame.draw.circle(self._surface, colors.Gold, render_position, 10, 2)
 
         for task in planner.tasks.finished_retrieval_tasks.values():
             location_absolute = origin.get_absolute(task.location)
@@ -252,7 +247,7 @@ class Camera:
             id_text = pygame.transform.rotate(id_text, -90)
             husky_image.blit(id_text, id_text.get_rect(center = husky_center))
 
-            end_effector_text = self._small_font.render(husky.end_effector, False, colors.WhiteSmoke)
+            end_effector_text = self._large_font.render(husky.end_effector[0:2], False, colors.WhiteSmoke)
             end_effector_text = pygame.transform.rotate(end_effector_text, -90)
             husky_image.blit(end_effector_text, end_effector_text.get_rect(center = (husky_center[0] - 20, husky_center[1])))
 
@@ -303,7 +298,7 @@ class Camera:
             self._surface.blit(self._pause_image, self._pause_image.get_rect(topleft = (10, 10)))
 
         run_time_text = self._large_font.render(f"{run_time} ms", False, colors.DarkGray)
-        self._surface.blit(run_time_text, run_time_text.get_rect(right = self._surface.get_width()))
+        self._surface.blit(run_time_text, run_time_text.get_rect(right = self._surface.get_width() - 20))
 
         # Help Text
         y = self._surface.get_height()

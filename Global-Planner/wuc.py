@@ -32,13 +32,11 @@ class CarrierQueue:
                         robot.todo.pop(0)
 
                 robot.todo.insert(0, tasks.Service(robot.charge, robot.bin))
-                robot.commands.clear()
 
     def _assign_retrieve_task(self, task, robot):
         # If this robot is currently only exploring, stop doing that
         if len(robot.todo) == 1 and isinstance(robot.todo[0], tasks.Explore):
             robot.todo.pop(0)
-            robot.commands.clear()
 
         robot.todo.append(task)
 
@@ -240,7 +238,6 @@ class Robot:
         self.bin = 0
         self.charge = 100
         self.todo = []
-        self.commands = []
         self.end_effector = None
 
 class PathPlanner:
@@ -370,6 +367,8 @@ class PathPlanner:
                 temp_g_score = g_score[current_spot] + traversal_cost
 
                 if neighbor_spot not in g_score or temp_g_score < g_score[neighbor_spot]:
+                    if current_spot in parents_by_child and parents_by_child[current_spot] == neighbor_spot: continue
+
                     parents_by_child[neighbor_spot] = current_spot
                     g_score[neighbor_spot] = temp_g_score
 
@@ -410,7 +409,7 @@ class WorkerUnitCoordinator:
             try: self.robots[id].pose = pose
             except KeyError: self.robots[id] = Robot(pose)
 
-    def sync_robot(self, id, charge, bin, end_effector, grid, discoveries, report):
+    def sync_robot(self, id, charge, bin, end_effector, grid, discoveries, ready):
         robot = self.robots[id]
 
         robot.charge = charge
@@ -420,23 +419,13 @@ class WorkerUnitCoordinator:
         self.map.notify_grid(robot.pose, grid)
         self.tasks.notify_discoveries(robot.pose, discoveries)
 
-        if report is not None:
-            if len(robot.commands) == 0: return
+        if ready and len(robot.todo) > 0:
+            finished_task = robot.todo.pop(0)
+            debug.log(f"{id} finished task {finished_task}")
 
-            done, failed, payload = report
-            if failed:
-                debug.log(f"{id} failed {robot.commands[0]}!")
-                robot.commands.clear()
-
-            elif done:
-                debug.log(f"{id} finished command {robot.commands.pop(0)}")
-                if len(robot.commands) == 0:
-                    finished_task = robot.todo.pop(0)
-                    debug.log(f"{id} finished task {finished_task}")
-
-                    if isinstance(finished_task, tasks.Retrieve):
-                        del self.tasks.active_retrieval_tasks[finished_task.id]
-                        self.tasks.finished_retrieval_tasks[finished_task.id] = finished_task
+            if isinstance(finished_task, tasks.Retrieve):
+                del self.tasks.active_retrieval_tasks[finished_task.id]
+                self.tasks.finished_retrieval_tasks[finished_task.id] = finished_task
 
     # Run
     @debug.profiled
@@ -449,12 +438,12 @@ class WorkerUnitCoordinator:
             debug.log(f"{id} tasks {robot.todo}")
 
         for id, robot in self.robots.items():
-            debug.log(f"{id} stats: pose = {robot.pose}, bin = {robot.bin}%, charge = {robot.charge}%")
+            debug.log(f"{id} pose: {robot.pose}, bin: {robot.bin}%, charge: {robot.charge}%")
 
-            # If there's a task in the queue but no commands, start the next task
-            # TODO: Probably should use states like the commands do...
-            if len(robot.commands) == 0 and len(robot.todo) > 0:
+            # If the first task is queued, start it
+            if len(robot.todo) > 0 and robot.todo[0].state == tasks.QUEUED:
                 next_task = robot.todo[0]
+                debug.log(f"{id} starting task {next_task}")
 
                 waypoints = self.flow.plan(robot.pose, next_task.location)
                 debug.log(f"{id} waypoints {waypoints}")
@@ -463,35 +452,33 @@ class WorkerUnitCoordinator:
                     print(f"[ERROR]: No path found for {id} from {robot.pose} to {next_task.location}!")
                     continue
 
+                commands = []
                 previous_pose = waypoints.pop(0)
+
                 for waypoint_absolute in waypoints:
                     waypoint_relative = waypoint_absolute.relative_to(previous_pose)
 
                     if waypoint_relative.x != 0 or waypoint_relative.y != 0:
-                        robot.commands.append(cmd.Command("Move", (waypoint_relative.x, waypoint_relative.y)))
+                        commands.append(cmd.Command("Move", (waypoint_relative.x, waypoint_relative.y)))
 
                     elif waypoint_relative.a != 0:
-                        robot.commands.append(cmd.Command("Rotate", waypoint_relative.a))
+                        commands.append(cmd.Command("Rotate", waypoint_relative.a))
 
                     previous_pose = waypoint_absolute
 
                 if isinstance(next_task, tasks.Retrieve):
-                    robot.commands.append(cmd.Command("Pick", (next_task.id, next_task.volume)))
+                    commands.append(cmd.Command("Pick", (next_task.id, next_task.volume)))
 
-                elif isinstance(next_task, tasks.Service):
-                    # TODO: These are different than the threshold values because it's opportunistic, verify these
-                    if robot.charge <= 50:
-                        robot.commands.append(cmd.Command("Charge", None))
+                # elif isinstance(next_task, tasks.Service):
+                #     # TODO: These are different than the threshold values because it's opportunistic, verify these
+                #     if robot.charge <= 50:
+                #         commands.append(cmd.Command("Charge", None))
+                #
+                #     if robot.bin >= 75:
+                #         commands.append(cmd.Command("Exchange", None))
 
-                    if robot.bin >= 75:
-                        robot.commands.append(cmd.Command("Exchange", None))
-
-            debug.log(f"{id} commands {robot.commands}")
-
-            if len(robot.commands) > 0:
-                if robot.commands[0].state == cmd.Queued:
-                    debug.log(f"{id} starting {robot.commands[0]}")
-                    plan[id] = robot.commands[0]
-                    robot.commands[0].state = cmd.Active
+                debug.log(f"{id} commands {commands}")
+                next_task.state = tasks.ACTIVE
+                plan[id] = commands
 
         return plan

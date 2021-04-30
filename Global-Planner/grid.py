@@ -1,5 +1,6 @@
 import common
 import math
+import random
 
 class Grid:
     def __init__(self, width, height, resolution):
@@ -10,7 +11,7 @@ class Grid:
         self.cols = math.ceil(width / resolution)
 
         # TODO: Get these from file or something
-        self.costs = [[tuple(i for i in range(4)) for _ in range(self.cols)] for _ in range(self.rows)]
+        self.costs = [[tuple(random.randint(0, 5) for _ in range(4)) for _ in range(self.cols)] for _ in range(self.rows)]
 
     def get_center(self, row, col):
         return common.Location(

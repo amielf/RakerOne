@@ -1,13 +1,13 @@
 {
     "simulation": {
-        "n_robots": 9,
+        "n_robots": 1,
 
-        "run_time_ms": 300000,
+        "run_time_sec": 180,
 
-        "update_plan_interval_ms": 250,
-        "sync_carrier_interval_ms": 100,
-        "sync_poses_interval_ms": 100,
-        "sync_robots_interval_ms": 100
+        "update_plan_interval_ms": 1000,
+        "sync_carrier_interval_ms": 500,
+        "sync_poses_interval_ms": 500,
+        "sync_robots_interval_ms": 500
     },
 
     "terrain": {
@@ -28,7 +28,7 @@
         "yolo_range_mm": 2134,
         "yolo_arc_deg": 180,
         "linear_speed_mph": 4,
-        "rotational_speed_dps": 90
+        "rotational_speed_dps": 36
     },
 
     "litter_distribution": {

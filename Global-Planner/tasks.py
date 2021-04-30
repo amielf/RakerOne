@@ -1,8 +1,12 @@
 import common
 
+QUEUED = 0
+ACTIVE = 1
+
 class Task:
     def __init__(self, location):
         self.location = location
+        self.state = QUEUED
 
 class Retrieve(Task):
     def __init__(self, id, location, type, volume, skills):

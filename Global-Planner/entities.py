@@ -21,8 +21,6 @@ class Husky(Entity):
         super(Husky, self).__init__()
         self.dimensions.update(990, 660)
 
-        self.action = None
-
         self.charge = full_charge
         self.full_charge = full_charge
 
@@ -35,21 +33,30 @@ class Husky(Entity):
         self.yolo_range = yolo_range
         self.yolo_arc = yolo_arc
 
-        self._half_lidar_arc = self.lidar_arc / 2
-        self._half_yolo_arc = self.yolo_arc / 2
-
         self.end_effector = None
 
         self.linear_speed = linear_speed
         self.rotational_speed = rotational_speed
 
+        self._half_lidar_arc = self.lidar_arc / 2
+        self._half_yolo_arc = self.yolo_arc / 2
+
+        self.actions = []
+
     # Actions
-    def execute(self, command):
-        self.action = actions.create(command)
+    def execute(self, commands):
+        self.actions.clear()
+        for command in commands:
+            self.actions.append(actions.create(command))
 
     def update(self, dt):
-        if self.action is None: return
-        self.action.run(dt, self)
+        if len(self.actions) == 0: return
+
+        while dt > 0 and len(self.actions) > 0:
+            elapsed = self.actions[0].run(dt, self)
+            if self.actions[0].done: self.actions.pop(0)
+
+            dt -= elapsed
 
     # LIDAR
     def get_partial_grid(self, grid):
