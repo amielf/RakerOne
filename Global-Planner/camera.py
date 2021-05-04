@@ -3,6 +3,7 @@ import math
 import pygame
 
 import common
+import tasks
 import util
 
 # The dimensions of the Clearpath Husky are 660x990 mm
@@ -144,23 +145,13 @@ class Camera:
             pygame.draw.rect(self._surface, colors.Red, cell_rect, 1)
 
         # Tasks
-        for task in planner.tasks.open_retrieval_tasks.values():
+        for task in planner.tasks.retrieval_task_queue:
             location_absolute = origin.get_absolute(task.location)
             render_position = self._get_render_position(location_absolute)
-            pygame.draw.circle(self._surface, colors.Coral, render_position, 10, 2)
-
-        for task in planner.tasks.active_retrieval_tasks.values():
-            location_absolute = origin.get_absolute(task.location)
-            render_position = self._get_render_position(location_absolute)
-            pygame.draw.circle(self._surface, colors.Gold, render_position, 10, 2)
-
-        for task in planner.tasks.finished_retrieval_tasks.values():
-            location_absolute = origin.get_absolute(task.location)
-            render_position = self._get_render_position(location_absolute)
-            pygame.draw.circle(self._surface, colors.DarkGray, render_position, 10, 2)
+            pygame.draw.circle(self._surface, colors.LightGray, render_position, 10, 2)
 
         # Lanes
-        for low, high in planner.flow.spans:
+        for low, high in planner.flow.lanes:
             render_low, _ = self._get_render_position(common.Location(low, 0))
             render_high, _ = self._get_render_position(common.Location(high, 0))
 
@@ -169,6 +160,13 @@ class Camera:
 
         # Robots
         for id, robot in planner.robots.items():
+            for task in robot.todo:
+                if not isinstance(task, tasks.Retrieve): continue
+
+                location_absolute = origin.get_absolute(task.location)
+                render_position = self._get_render_position(location_absolute)
+                pygame.draw.circle(self._surface, colors.Gold, render_position, 10, 2)
+
             # The planner's robot pose is relative to the carrier; transform back to global coordinates to draw
             robot_pose_absolute = origin.get_absolute(robot.pose)
             if not self._visible_world_rect.collidepoint(robot_pose_absolute.x, robot_pose_absolute.y): continue
@@ -179,9 +177,17 @@ class Camera:
                 pygame.draw.circle(self._surface, colors.HotPink, robot_render_position, 3)
 
             if self._show_tasks and len(robot.todo) > 0:
-                location_absolute = origin.get_absolute(robot.todo[0].location)
+                task = robot.todo[0]
+
+                color = colors.Black
+                if isinstance(task, tasks.Service): color = colors.OrangeRed
+                elif isinstance(task, tasks.Retrieve): color = colors.DarkGoldenrod
+                elif isinstance(task, tasks.Explore): color = colors.LightSeaGreen
+
+                location_absolute = origin.get_absolute(task.location)
                 target_render_position = self._get_render_position(location_absolute)
-                pygame.draw.line(self._surface, colors.LightSeaGreen, robot_render_position, target_render_position, 3)
+
+                pygame.draw.line(self._surface, color, robot_render_position, target_render_position, 1)
 
     # Rendering
     def _get_render_position(self, world_position):

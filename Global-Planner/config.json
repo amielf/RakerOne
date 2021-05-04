@@ -1,17 +1,16 @@
 {
     "simulation": {
-        "n_robots": 1,
-
-        "run_time_sec": 180,
+        "run_time_sec": 600,
+        "step_delta_ms": 100,
 
         "update_plan_interval_ms": 1000,
-        "sync_carrier_interval_ms": 500,
-        "sync_poses_interval_ms": 500,
-        "sync_robots_interval_ms": 500
+        "sync_carrier_interval_ms": 100,
+        "sync_poses_interval_ms": 100,
+        "sync_robots_interval_ms": 1000
     },
 
     "terrain": {
-        "width_mm": 18288,
+        "width_mm": 18000,
         "height_mm": 3219000,
         "resolution_mm": 1000
     },
@@ -20,40 +19,55 @@
         "speed_mph": 2
     },
 
-    "robot": {
+    "robots": {
         "full_charge_v": 24,
         "bin_capacity_mm3": 10,
-        "lidar_range_mm": 12000,
+        "lidar_range_m": 12,
         "lidar_arc_deg": 90,
-        "yolo_range_mm": 2134,
+        "yolo_range_ft": 7,
         "yolo_arc_deg": 180,
         "linear_speed_mph": 4,
-        "rotational_speed_dps": 36
+        "rotational_speed_dps": 90,
+
+        "end_effectors": [
+            {
+                "name": "gripper",
+                "robots": []
+            },
+            {
+                "name": "spike",
+                "robots": []
+            },
+            {
+                "name": "vacuum",
+                "robots": [1,2,3,4,5,6,7,8,9]
+            }
+        ]
     },
 
-    "litter_distribution": {
+    "litter": {
         "total": 5000,
-        "types": [
+        "distribution": [
             {
                 "name": "glass_bottle",
                 "volume_mm3": 5,
                 "certainty": [0.70, 0.99],
                 "end_effectors": ["gripper"],
-                "percentage": 10
+                "percentage": 0
             },
             {
                 "name": "paper_bag",
                 "volume_mm3": 1,
                 "certainty": [0.30, 0.72],
                 "end_effectors": ["gripper", "spike"],
-                "percentage": 70
+                "percentage": 0
             },
             {
                 "name": "cig",
-                "volume_mm3": 1,
+                "volume_mm3": 0.1,
                 "certainty": [0.50, 0.80],
-                "end_effectors": ["suction"],
-                "percentage": 20
+                "end_effectors": ["vacuum"],
+                "percentage": 100
             }
         ]
     }

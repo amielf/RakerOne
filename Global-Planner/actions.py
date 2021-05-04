@@ -88,6 +88,7 @@ class _PickAction(_Action):
         self.countdown -= elapsed
         if self.countdown == 0:
             husky.bin += self.volume
+            husky.picked_trash_id = self.trash_id
             self.done = True
 
         return elapsed

@@ -1,20 +1,35 @@
+import common
 import cmd
 import debug
 import math
-import common
-import tasks
 import queue
+import random
+import tasks
+
+class LocationTracker:
+    def __init__(self):
+        self._poses = []
+
+    def track(self, pose):
+        self._poses.append(pose)
+
+    def remove(self, pose):
+        self._poses.remove(pose)
+
+    def update(self, dy):
+        for pose in self._poses:
+            pose.y -= dy
 
 class CarrierQueue:
     def __init__(self, map, flow):
         self.map = map
         self.flow = flow
 
-        self.open_retrieval_tasks = {}
-        self.active_retrieval_tasks = {}
-        self.finished_retrieval_tasks = {}
+        self.location_tracker = LocationTracker()
+        self.retrieval_task_queue = []
 
-        self._locations_by_bucket = {}
+        self._known_trash_ids = set()
+        self._max_assignments_per_robot = 3
 
     def _assign_service_tasks(self, robots):
         for id, robot in robots.items():
@@ -25,97 +40,83 @@ class CarrierQueue:
                     # If already doing a Service task, leave it alone
                     if isinstance(current_active_task, tasks.Service): continue
 
-                    # If taking a Retrieve task out of assignment, add it back to the open list
+                    # If taking a Retrieve task out of assignment, add it to the front of the queue
                     if isinstance(current_active_task, tasks.Retrieve):
-                        del self.active_retrieval_tasks[current_active_task.id]
-                        self.open_retrieval_tasks[current_active_task.id] = current_active_task
-                        robot.todo.pop(0)
+                        self.retrieval_task_queue.insert(0, current_active_task)
 
                 robot.todo.insert(0, tasks.Service(robot.charge, robot.bin))
 
-    def _assign_retrieve_task(self, task, robot):
-        # If this robot is currently only exploring, stop doing that
-        if len(robot.todo) == 1 and isinstance(robot.todo[0], tasks.Explore):
-            robot.todo.pop(0)
-
-        robot.todo.append(task)
-
     # Notify
-    def notify_movement(self, dy):
-        for task in self.open_retrieval_tasks.values():
-            task.location.y -= dy
-
-        for task in self.active_retrieval_tasks.values():
-            task.location.y -= dy
-
-        for task in self.finished_retrieval_tasks.values():
-            task.location.y -= dy
-
     def notify_discoveries(self, robot_pose, discoveries):
         for discovery in discoveries:
             id, location_relative, type, volume, certainty, end_effectors = discovery
-            if certainty < 0.3: continue
-
-            location_absolute = robot_pose.get_absolute(location_relative)
 
             # Having the ID is cheating, since in real life there's no way to identify before discovery
             # This would normally be handled by some form of geo-caching
-            if id in self.open_retrieval_tasks: continue
-            if id in self.active_retrieval_tasks: continue
-            if id in self.finished_retrieval_tasks: continue
+            if id in self._known_trash_ids: continue
+            if certainty < 0.3: continue
 
-            self.open_retrieval_tasks[id] = tasks.Retrieve(id, location_absolute, type, volume, end_effectors)
+            location_absolute = robot_pose.get_absolute(location_relative)
+            self.retrieval_task_queue.append(tasks.Retrieve(id, location_absolute, type, volume, end_effectors))
+            self.location_tracker.track(location_absolute)
+            self._known_trash_ids.add(id)
 
     @debug.profiled
     def allocate(self, robots):
-        #self._assign_service_tasks(robots)
+        robots_list = list(robots.values())
+        random.shuffle(robots_list)
 
-        assigned_tasks = []
+        # Clear out exploration tasks; the map has likely updated anyway
+        for robot in robots_list:
+            if len(robot.todo) > 0 and isinstance(robot.todo[0], tasks.Explore):
+                robot.todo.pop(0)
 
-        for task in self.open_retrieval_tasks.values():
-            candidate_robots = [robot for id, robot in robots.items() if robot.end_effector in task.skills]
+        # self._assign_service_tasks(robots)
+
+        remove_indices = []
+
+        self.retrieval_task_queue.sort(key =  lambda t: t.location.y)
+
+        for i in range(len(self.retrieval_task_queue)):
+            task = self.retrieval_task_queue[i]
+
+            candidate_robots = [robot for robot in robots_list if robot.end_effector in task.skills]
             if len(candidate_robots) == 0:
                 print(f"[ERROR]: {task.type} cannot be retrieved from {task.location} by any robot; requires {task.skills}.")
                 continue
 
-            available_robots = [robot for robot in candidate_robots if len(robot.todo) < 3]
+            available_robots = [robot for robot in candidate_robots if len(robot.todo) < self._max_assignments_per_robot]
 
             min_score = 999999
             closest_robot = None
 
             for match in available_robots:
-                start = match.pose.location
-                if len(match.todo) > 0:
-                    last_task = match.todo[-1]
-                    if not isinstance(last_task, tasks.Explore): start = last_task.location
+                start = match.todo[-1].location if len(match.todo) > 0 else match.pose.location
 
                 distance = self.flow.distance(start, task.location)
                 if distance is None: continue
 
-                score = distance
-                if len(match.todo) > 0 and not isinstance(match.todo[-1], tasks.Explore):
-                    score += 100 * len(match.todo)
-
+                score = distance + 1000 * len(match.todo)
                 if score < min_score:
                     min_score = score
                     closest_robot = match
 
             if closest_robot is not None:
-                self._assign_retrieve_task(task, closest_robot)
-                assigned_tasks.append(task)
+                closest_robot.todo.append(task)
+                remove_indices.append(i)
 
-        for task in assigned_tasks:
-            del self.open_retrieval_tasks[task.id]
-            self.active_retrieval_tasks[task.id] = task
+        remove_indices.reverse()
+        for i in remove_indices:
+            self.retrieval_task_queue.pop(i)
 
         # assign explore task to any robots not already allocated
-        assigned_points = []
+        assigned_points = set()
 
-        for id, robot in robots.items():
+        for robot in robots_list:
             if len(robot.todo) > 0: continue
 
-            max_distance = 0
-            farthest_point = None
+            min_distance = 999999
+            closest_point = None
 
             for row, col in self.map.frontier:
                 center_location = self.map.get_center_location(row, col)
@@ -124,16 +125,18 @@ class CarrierQueue:
                 distance = self.flow.distance(robot.pose.location, center_location)
                 if distance is None: continue
 
-                if distance >= max_distance:
-                    max_distance = distance
-                    farthest_point = center_location
+                if distance < min_distance:
+                    min_distance = distance
+                    closest_point = center_location
 
-            if farthest_point is not None:
-                robot.todo.append(tasks.Explore(farthest_point))
-                assigned_points.append(farthest_point)
+            if closest_point is not None:
+                robot.todo.append(tasks.Explore(closest_point))
+                assigned_points.add(closest_point)
 
 class Map:
     def __init__(self):
+        self.width = 18000
+        self.height = 3219000
         self.resolution = 1000
 
         self.grid = {}
@@ -244,38 +247,51 @@ class PathPlanner:
     def __init__(self, map):
         self.map = map
 
-        self.spans = [(start, start + 6000) for start in range(1000, 19000, 6000)]
-        #self.spans = [(0, 19000)]
+        # lane_cells = 6000
+        # self.lanes = [(start, start + lane_cells) for start in range(0, self.map.width, lane_cells)]
+        self.lanes = [(0, self.map.width)]
 
     def _get_lane(self, position):
-        for span in self.spans:
+        for span in self.lanes:
             if span[0] <= position.x < span[1]: return span
 
-    def distance(self, start, goal):
-        """
-        Calculate the distance between the start and goal based on the flow
-        A value of None indicates that there is no path
+        return None
 
-        In this case, there is no path across lanes and within lanes it's simple Euclidean distance
-        # TODO: Depending on the average terrain it may be possible to get away with simple Taxicab distance
-        """
+    def distance(self, start, goal):
         start_lane = self._get_lane(start)
         goal_lane = self._get_lane(goal)
 
+        # Robots may not cross lanes, indicated as a null distance
         if start_lane != goal_lane: return None
 
-        penalty = 2 if goal.y < start.y else 1
-        return penalty * start.distance(goal)
+        # Double backward movement distance to cover the travel down and back
+        multiplier = 2 if goal.y < start.y else 1
+        return multiplier * start.distance(goal)
 
-    def reconstruct_path(self, parents_by_child, goal_spot):
-        path = [goal_spot]; current_spot = goal_spot
+    def _build_path(self, parents_by_child, goal_spot):
+        grid_path = [goal_spot]; current_spot = goal_spot
 
         while current_spot in parents_by_child:
             current_spot = parents_by_child[current_spot]
-            path.append(current_spot)
+            grid_path.append(current_spot)
 
-        path.reverse()
-        return path
+        grid_path.reverse()
+
+        previous_waypoint = self.map.get_center_location(*grid_path.pop(0))
+
+        waypoint_path = []
+        for r, c in grid_path:
+            current = self.map.get_center_location(r, c)
+            heading = math.degrees(
+                math.atan2(
+                    current.y - previous_waypoint.y,
+                    current.x - previous_waypoint.x
+                )
+            )
+            waypoint_path.append(common.Pose(current.x, current.y, heading))
+            previous_waypoint = current
+
+        return waypoint_path
 
     def _get_traversal_cost(self, current_spot, neighbor_spot):
         scores = self.map.grid[current_spot]
@@ -325,41 +341,30 @@ class PathPlanner:
             open_set.remove(current_spot)
 
             if current_spot == goal_spot:
-                grid_path = self.reconstruct_path(parents_by_child, goal_spot)
+                path = self._build_path(parents_by_child, goal_spot)
 
-                previous = self.map.get_center_location(*grid_path.pop(0))
-
-                waypoint_path = []
-                for r, c in grid_path:
-                    current = self.map.get_center_location(r, c)
-                    heading = math.degrees(
-                        math.atan2(
-                            current.y - previous.y,
-                            current.x - previous.x
-                        )
-                    )
-                    waypoint_path.append(common.Pose(current.x, current.y, heading))
-                    previous = current
-
+                # Add the initial movement from the start pose to the SECOND grid cell center in the path
                 initial_heading = math.degrees(
                     math.atan2(
-                        waypoint_path[0].y - start_pose.y,
-                        waypoint_path[0].x - start_pose.x
+                        path[0].y - start_pose.y,
+                        path[0].x - start_pose.x
                     )
                 )
-                waypoint_path[0].a = initial_heading
-                waypoint_path.insert(0, start_pose)
+                path[0].a = initial_heading
+                path.insert(0, start_pose)
 
-                waypoint_path.pop()
+                # Remove the final grid cell center and replace it with the goal pose
+                path.pop()
                 final_heading = math.degrees(
                     math.atan2(
-                        goal_pose.y - waypoint_path[-1].y,
-                        goal_pose.x - waypoint_path[-1].x
+                        goal_pose.y - path[-1].y,
+                        goal_pose.x - path[-1].x
                     )
                 )
-                waypoint_path.append(common.Pose(goal_pose.x, goal_pose.y, final_heading))
+                path.append(common.Pose(goal_pose.x, goal_pose.y, final_heading))
 
-                return waypoint_path
+                return path
+
 
             for neighbor_spot in self.map.get_all_neighbors(current_spot):
                 traversal_cost = self._get_traversal_cost(current_spot, neighbor_spot)
@@ -402,7 +407,7 @@ class WorkerUnitCoordinator:
         self._carrier_speed = vy
 
         self.map.notify_movement(dy)
-        self.tasks.notify_movement(dy)
+        self.tasks.location_tracker.update(dy)
 
     def sync_poses(self, poses):
         for id, pose in poses.items():
@@ -421,26 +426,20 @@ class WorkerUnitCoordinator:
 
         if ready and len(robot.todo) > 0:
             finished_task = robot.todo.pop(0)
+            self.tasks.location_tracker.remove(finished_task.location)
             debug.log(f"{id} finished task {finished_task}")
 
-            if isinstance(finished_task, tasks.Retrieve):
-                del self.tasks.active_retrieval_tasks[finished_task.id]
-                self.tasks.finished_retrieval_tasks[finished_task.id] = finished_task
-
     # Run
-    @debug.profiled
     def get(self):
         debug.log("Planning")
         plan = {}
 
         self.tasks.allocate(self.robots)
-        for id, robot in self.robots.items():
-            debug.log(f"{id} tasks {robot.todo}")
 
         for id, robot in self.robots.items():
             debug.log(f"{id} pose: {robot.pose}, bin: {robot.bin}%, charge: {robot.charge}%")
+            debug.log(f"{id} tasks: {robot.todo}")
 
-            # If the first task is queued, start it
             if len(robot.todo) > 0 and robot.todo[0].state == tasks.QUEUED:
                 next_task = robot.todo[0]
                 debug.log(f"{id} starting task {next_task}")

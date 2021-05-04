@@ -1,5 +1,3 @@
-import time
-
 import actions
 import camera
 import debug
@@ -9,6 +7,7 @@ import json
 import metrics
 import pygame
 import random
+import time
 import types
 
 class _IntervalTimer:
@@ -42,14 +41,15 @@ class _EventPump:
                     handler(event)
 
 class Simulation:
-    def __init__(self, config_filename):
+    def __init__(self, filename):
         pygame.init()
 
-        with open(config_filename, "r") as file:
+        with open(filename, "r") as file:
             config = json.load(file, object_hook = lambda d: types.SimpleNamespace(**d))
 
-        self._desired_run_time = config.simulation.run_time_sec * 1000
-        self._sim_time = 0
+        self._run_time_ms = config.simulation.run_time_sec * 1000
+        self._dt = config.simulation.step_delta_ms
+        self._now = 0
 
         self._grid = grid.Grid(
             config.terrain.width_mm,
@@ -78,45 +78,72 @@ class Simulation:
             self._sync_robots
         )
 
+        # Entities
+        self._carrier = entities.Carrier(config.carrier.speed_mph * 0.44704)
+
+        random.seed(1000)
+
+        self._huskies = dict()
+        for end_effector in config.robots.end_effectors:
+            for id in end_effector.robots:
+                self._huskies[id] = entities.Husky(
+                    config.robots.full_charge_v,
+                    config.robots.bin_capacity_mm3,
+                    config.robots.lidar_range_m * 1000,
+                    config.robots.lidar_arc_deg,
+                    config.robots.yolo_range_ft * 304.8,
+                    config.robots.yolo_arc_deg,
+                    config.robots.linear_speed_mph * 0.44704,
+                    config.robots.rotational_speed_dps,
+                    end_effector.name
+                )
+
+                self._huskies[id].pose.x = 500 + 2000 * (id - 1)
+                self._huskies[id].pose.y = 500
+                self._huskies[id].pose.a = 90
+
+        self._litter = dict()
+        self._collected_litter = set()
+
+        hat = []
+        for trash_spec in config.litter.distribution:
+            hat.extend(trash_spec for _ in range(trash_spec.percentage))
+
+        assert len(hat) == 100, f"Litter distribution percentages total {len(hat)}."
+
+        padding = config.terrain.resolution_mm
+
+        for i in range(config.litter.total):
+            trash_spec = random.choice(hat)
+            certainty = random.uniform(*trash_spec.certainty)
+
+            trash = entities.Trash(
+                i + 1,
+                trash_spec.name,
+                trash_spec.volume_mm3,
+                certainty,
+                trash_spec.end_effectors
+            )
+
+            trash.pose.x = random.randint(padding, config.terrain.width_mm - padding)
+            trash.pose.y = random.randint(padding, config.terrain.height_mm - padding)
+
+            self._litter[trash.id] = trash
+
         self._events = _EventPump(self)
         self._events.handle(pygame.QUIT, self._on_quit)
         self._events.handle(pygame.KEYDOWN, self._on_keydown)
 
-        self._clock = pygame.time.Clock()
-
-        # Entities
-        self._carrier = entities.Carrier(config.carrier.speed_mph * 0.44704)
-        self._carrier_dy = 0
-
-        self._huskies = {
-            i + 1: entities.Husky(
-                config.robot.full_charge_v,
-                config.robot.bin_capacity_mm3,
-                config.robot.lidar_range_mm,
-                config.robot.lidar_arc_deg,
-                config.robot.yolo_range_mm,
-                config.robot.yolo_arc_deg,
-                config.robot.linear_speed_mph * 0.44704,
-                config.robot.rotational_speed_dps
-            )
-
-            for i in range(config.simulation.n_robots)
-        }
-
-        self._litter = {}
-        self._litter_distribution = config.litter_distribution
-        self._collected_litter = {}
-
-        # Camera
-        surface = pygame.display.set_mode((700, 900))
+        surface = pygame.display.set_mode((700, 1000))
         pygame.display.set_caption("Global Planner Simulator")
         self._camera = camera.Camera(surface, self._events)
 
-        self._paused = False
+        self._paused = True
         self._finished = False
 
     # Event Handlers
     def _on_quit(self, _):
+        metrics.save()
         pygame.quit()
         quit(0)
 
@@ -124,16 +151,11 @@ class Simulation:
         if event.key == pygame.K_p: self._paused = not self._paused
 
     # Interval Functions
-    def _update_plan(self, planner):
-        plan = planner.get()
-        for id, commands in plan.items():
-            self._huskies[id].execute(commands)
-
+    @debug.profiled
     def _sync_carrier(self, planner):
-        vy = self._carrier.speed
-        planner.sync_carrier(self._carrier_dy, vy)
-        self._carrier_dy = 0
+        planner.sync_carrier(*self._carrier.get_monitor_data())
 
+    @debug.profiled
     def _sync_poses(self, planner):
         poses = {}
         for id, husky in self._huskies.items():
@@ -142,6 +164,7 @@ class Simulation:
 
         planner.sync_poses(poses)
 
+    @debug.profiled
     def _sync_robots(self, planner):
         for id, husky in self._huskies.items():
             charge = 100 * (husky.charge / husky.full_charge)
@@ -149,92 +172,73 @@ class Simulation:
 
             grid = husky.get_partial_grid(self._grid)
 
-            litter = husky.get_visible_litter(self._litter.values())
-
+            litter = husky.get_visible_litter(self._litter)
             for trash in litter:
                 trash_id = trash[0]
                 if trash_id not in metrics.discovery_time_by_id:
                     trash = self._litter[trash_id]
-                    metrics.discovery_time_by_id[trash_id] = (trash.type, trash.pose.location, self._sim_time)
+                    metrics.discovery_time_by_id[trash_id] = (trash.type, trash.pose.location, self._now)
 
             next_task_please = len(husky.actions) == 0
 
             planner.sync_robot(id, charge, bin, husky.end_effector, grid, litter, next_task_please)
 
-    # Run
-    def _setup(self):
-        random.seed(8286)
-
-        self._sim_time = 0
-
-        # Set robot poses and initial values
-        end_effectors = ["spike", "gripper", "suction"]
-
-        for id, husky in self._huskies.items():
-            husky.pose.x = 1500 + 2000 * (id - 1)
-            husky.pose.y = 500
-            husky.pose.a = random.randint(60, 120)
-
-            husky.end_effector = end_effectors[(id - 1) % 3]
-
-        hat = []
-        for i in range(len(self._litter_distribution.types)):
-            hat.extend(i for _ in range(self._litter_distribution.types[i].percentage))
-
-        assert len(hat) == 100, f"Distribution percentages sum to {len(hat)}%"
-
-        for j in range(self._litter_distribution.total):
-            i = random.choice(hat)
-            type = self._litter_distribution.types[i]
-
-            self._litter[j + 1] = entities.Trash(
-                j + 1,
-                type.name,
-                type.volume_mm3,
-                random.uniform(*type.certainty),
-                type.end_effectors
-            )
-
-        padding = 1000
-        for id, trash in self._litter.items():
-            trash.pose.x = random.randint(padding, self._grid.width - padding)
-            trash.pose.y = random.randint(padding, self._grid.height - padding)
-
     @debug.profiled
-    def _step(self, dt, planner):
-        dy = int(self._carrier.speed * dt)
-        self._carrier.pose.y += dy
-        self._carrier_dy += dy
+    def _update_plan(self, planner):
+        plan = planner.get()
+        for id, commands in plan.items():
+            self._huskies[id].execute(commands)
 
-        self._sync_carrier_timer.tick(dt, planner)
+    # Run
+    @debug.profiled
+    def _step(self, planner):
+        self._carrier.move(self._dt)
+        self._sync_carrier_timer.tick(self._dt, planner)
 
         for id, husky in self._huskies.items():
-            husky.update(dt)
+            husky.update(self._dt)
 
-        self._sync_poses_timer.tick(dt, planner)
-        self._sync_robots_timer.tick(dt, planner)
+            for action in husky.finished_actions:
+                if isinstance(action, actions._PickAction):
+                    trash_id = action.trash_id
 
-        self._update_plan_timer.tick(dt, planner)
+                    trash = self._litter[trash_id]
+                    metrics.pick_time_by_id[trash_id] = (trash.type, trash.pose.location, self._now)
 
-        self._sim_time += dt
-        metrics.collected_trash_by_time.append((self._sim_time, len(planner.tasks.finished_retrieval_tasks)))
+                    del self._litter[trash_id]
+                    self._collected_litter.add(trash_id)
+
+            husky.finished_actions.clear()
+
+        self._sync_poses_timer.tick(self._dt, planner)
+        self._sync_robots_timer.tick(self._dt, planner)
+
+        self._update_plan_timer.tick(self._dt, planner)
+
+        self._now += self._dt
+        metrics.collected_trash_by_time.append(
+            (
+                self._now,
+                len(self._collected_litter)
+            )
+        )
 
     def run(self, planner):
-        self._setup()
         self._sync_poses(planner)
+        self._sync_robots(planner)
 
-        frame_countdown = 50
+        frame_countdown = 0
         prev = time.perf_counter()
 
         while True:
             self._events.process(self)
 
-            if self._sim_time >= self._desired_run_time:
+            if self._now >= self._run_time_ms:
                 if not self._finished: metrics.save()
                 self._finished = True
 
             if not self._paused and not self._finished:
-                self._step(500, planner)
+                self._step(planner)
 
             now = time.perf_counter()
             frame_countdown -= (now - prev) * 1000
@@ -248,7 +252,7 @@ class Simulation:
                     self._huskies,
                     self._litter,
                     self._paused,
-                    self._sim_time
+                    self._now
                 )
                 frame_countdown = 50
 

@@ -1,5 +1,6 @@
 import abc
 import actions
+import debug
 import math
 import common
 import pygame
@@ -14,34 +15,47 @@ class Carrier(Entity):
         super(Carrier, self).__init__()
         self.dimensions.update(2550, 11950)
 
-        self.speed = speed
+        self._speed = speed
+        self._dy = 0
+
+    # Move
+    def move(self, dt):
+        dy = self._speed * dt
+        self.pose.y += dy
+        self._dy += dy
+
+    # Monitor
+    def get_monitor_data(self):
+        data = (self._dy, self._speed)
+        self._dy = 0
+        return data
 
 class Husky(Entity):
-    def __init__(self, full_charge, bin_capacity, lidar_range, lidar_arc, yolo_range, yolo_arc, linear_speed, rotational_speed):
+    def __init__(self, full_charge, bin_capacity, lidar_range, lidar_arc, yolo_range, yolo_arc, linear_speed, rotational_speed, end_effector):
         super(Husky, self).__init__()
         self.dimensions.update(990, 660)
 
-        self.charge = full_charge
+        self.charge = float(full_charge)
         self.full_charge = full_charge
 
         self.bin = 0
-        self.bin_capacity = bin_capacity
+        self.bin_capacity = float(bin_capacity)
 
         self.lidar_range = lidar_range
         self.lidar_arc = lidar_arc
-
         self.yolo_range = yolo_range
         self.yolo_arc = yolo_arc
 
-        self.end_effector = None
+        self.end_effector = end_effector
 
         self.linear_speed = linear_speed
         self.rotational_speed = rotational_speed
 
+        self.actions = []
+        self.finished_actions = []
+
         self._half_lidar_arc = self.lidar_arc / 2
         self._half_yolo_arc = self.yolo_arc / 2
-
-        self.actions = []
 
     # Actions
     def execute(self, commands):
@@ -54,11 +68,14 @@ class Husky(Entity):
 
         while dt > 0 and len(self.actions) > 0:
             elapsed = self.actions[0].run(dt, self)
-            if self.actions[0].done: self.actions.pop(0)
+            if self.actions[0].done:
+                finished_action = self.actions.pop(0)
+                self.finished_actions.append(finished_action)
 
             dt -= elapsed
 
     # LIDAR
+    @debug.profiled
     def get_partial_grid(self, grid):
         hops = self.lidar_range // grid.resolution
 
@@ -80,9 +97,13 @@ class Husky(Entity):
         return partial_grid
 
     # Classifier
-    def get_visible_litter(self, all_litter):
+    @debug.profiled
+    def get_visible_litter(self, litter):
+        robot_bucket = (self.pose.x // 1000, self.pose.y // 1000)
+        hops = self.yolo_range // 1000
+
         visible_litter = []
-        for trash in all_litter:
+        for tid, trash in litter.items():
             if self.pose.distance(trash.pose.location) < self.yolo_range:
                 pose_relative_to_robot = trash.pose.relative_to(self.pose)
 
@@ -92,7 +113,7 @@ class Husky(Entity):
 
                 visible_litter.append(
                     (
-                        trash.id,
+                        tid,
                         pose_relative_to_robot.location,
                         trash.type,
                         trash.volume,
@@ -113,5 +134,3 @@ class Trash(Entity):
         self.volume = volume
         self.certainty = certainty
         self.end_effectors = end_effectors
-
-        self.discovered = False
