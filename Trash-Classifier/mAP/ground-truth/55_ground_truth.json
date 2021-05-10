@@ -1,0 +1,1 @@
+[{"class_name": "Paper cup", "bbox": "99 86 224 225", "used": true}, {"class_name": "Paper cup", "bbox": "297 89 387 163", "used": true}, {"class_name": "Plastic lid", "bbox": "97 60 227 143", "used": true}, {"class_name": "Plastic lid", "bbox": "293 54 398 100", "used": true}, {"class_name": "Paper straw", "bbox": "128 0 171 132", "used": false}]

@@ -1,0 +1,1 @@
+[{"class_name": "Single-use carrier bag", "bbox": "184 292 290 345", "used": false}, {"class_name": "Plastic film", "bbox": "125 308 150 327", "used": true}, {"class_name": "Plastic film", "bbox": "213 139 229 159", "used": true}, {"class_name": "Plastic film", "bbox": "128 113 145 122", "used": false}, {"class_name": "Unlabeled litter", "bbox": "174 17 195 23", "used": false}]
