@@ -1,0 +1,1 @@
+[{"class_name": "Disposable plastic cup", "bbox": "275 164 308 190", "used": true}, {"class_name": "Plastic lid", "bbox": "275 161 297 173", "used": false}, {"class_name": "Other plastic", "bbox": "316 210 323 232", "used": false}, {"class_name": "Unlabeled litter", "bbox": "365 154 385 171", "used": true}, {"class_name": "Cigarette", "bbox": "26 100 31 103", "used": false}]

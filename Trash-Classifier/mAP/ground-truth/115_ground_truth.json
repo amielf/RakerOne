@@ -1,0 +1,1 @@
+[{"class_name": "Other carton", "bbox": "260 57 413 137", "used": true}, {"class_name": "Aluminium blister pack", "bbox": "304 204 416 282", "used": false}, {"class_name": "Normal paper", "bbox": "192 184 279 267", "used": false}, {"class_name": "Plastic film", "bbox": "5 111 212 308", "used": false}]
