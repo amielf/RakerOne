@@ -1,6 +1,7 @@
 Folder for Base Navigation
+NOTE: Base Navigation essentially was rescope to Terrain Assessment
 
-Several projects were relied upon for this effort:
+Several openly available projects were relied upon for this effort:
 
 1. https://www.clearpathrobotics.com/assets/guides/kinetic/husky/SimulatingHusky.html
 
