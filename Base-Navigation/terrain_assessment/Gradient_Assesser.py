@@ -41,14 +41,14 @@ def Assess_Gradients(x_low, x_high, y_low, y_high, a , b, c, d):
     # NOTE: Max_climb bounds both + and - maximum.  Robot should not be driving down
     # Max_climb slope
     
-
+    print(type(a))
     A = a; #-1.5
     B = b; #-1
     C = c; # 2
     D = d; # 0
     
-    x = np.arange(x_low, x_high, .1)
-    y = np.arange(y_low, y_high, .1)
+    x = np.arange(x_low, x_high, .05)
+    y = np.arange(y_low, y_high, .05)
     
     xx, yy = np.meshgrid(x, y)
     
@@ -67,7 +67,7 @@ def Assess_Gradients(x_low, x_high, y_low, y_high, a , b, c, d):
         
         fig = plt.figure()
         ax = plt.axes(projection='3d')
-        ax.contour3D(xx, yy, z,50)
+        ax.contour3D(xx, yy, z,30)
         ax.set_xlabel('xx')
         ax.set_ylabel('yy')
         ax.set_zlabel('z');
@@ -82,7 +82,7 @@ def Assess_Gradients(x_low, x_high, y_low, y_high, a , b, c, d):
         ymid = (y_high + y_low)/2
         yhigh = y_high
         
-        print(xlow)
+        print(xlow, xmid, xhigh, ylow, ymid, yhigh)
         
         
         # Grade 0 - Original Forward direction gradient
@@ -95,10 +95,10 @@ def Assess_Gradients(x_low, x_high, y_low, y_high, a , b, c, d):
         grade_degrees_0 = math.atan(z_delta0/y_delta0)*180/3.14159
         
         # Plot the line of grade 0
-        x0=np.zeros(20)
+        x0=np.full((20), xmid)
         y0=np.linspace(ylow,yhigh,num=20)
         z0 =np.linspace(z_xm_yl,z_xm_yh,num=20)
-        
+        	
         ax.plot3D(x0, y0, z0);
         
         ######
@@ -136,7 +136,7 @@ def Assess_Gradients(x_low, x_high, y_low, y_high, a , b, c, d):
         
         # Plot the line of grade 2
         x2=np.linspace(xhigh,xlow,num=20)
-        y2=np.zeros(20)
+        y2=np.full((20), ymid)
         z2 =np.linspace(z_xh_ym,z_xl_ym,num=20)
         
         ax.plot3D(x2, y2, z2);
@@ -165,26 +165,26 @@ def Assess_Gradients(x_low, x_high, y_low, y_high, a , b, c, d):
         
         plt.show()
         
-    
-#    # return grades dictionary
-#    
-#    grades = dict();
-#    grades[0]=grade_degrees_0
-#    grades[1]=grade_degrees_1
-#    grades[2]=grade_degrees_2
-#    grades[3]=grade_degrees_3
-#    
-#    return (grades)
-
-    # Return dictionary of grade relative to Max_Climb of 45 degrees (defined above)
+     
+    # return grades dictionary
     
     grades = dict();
-    grades[0]=grade_degrees_0/Max_Climb;
-    grades[1]=grade_degrees_1/Max_Climb;
-    grades[2]=grade_degrees_2/Max_Climb;
-    grades[3]=grade_degrees_3/Max_Climb;
+    grades[0]=grade_degrees_0
+    grades[1]=grade_degrees_1
+    grades[2]=grade_degrees_2
+    grades[3]=grade_degrees_3
     
     return (grades)
+
+    # # Return dictionary of grade relative to Max_Climb of 45 degrees (defined above)
+    
+    # grades = dict();
+    # grades[0]=grade_degrees_0/Max_Climb;
+    # grades[1]=grade_degrees_1/Max_Climb;
+    # grades[2]=grade_degrees_2/Max_Climb;
+    # grades[3]=grade_degrees_3/Max_Climb;
+    
+    # return (grades)
 
 
 
@@ -192,7 +192,7 @@ def Assess_Gradients(x_low, x_high, y_low, y_high, a , b, c, d):
 ## provides a buffer before hitting Max_Climb
 #warning = 0.8; # Percent of Max_Climb where the robot is warned of steepness
 
-ans = Assess_Gradients(-10,10,-10,10,-1,-1,-1,0)
+ans = Assess_Gradients(-6,-5,43,44,0.0111777,-0.084076,5.068326,0)
 print(ans[0])
 print(ans[1])
 print(ans[2])
