@@ -1,0 +1,5 @@
+<launch>
+    <node pkg="pcl_ros" type="pointcloud_to_pcd" name="pcd_out">
+	<remap from="input" to="combined_pointcloud" />
+    </node>
+</launch>

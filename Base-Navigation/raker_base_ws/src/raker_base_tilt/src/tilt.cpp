@@ -1,3 +1,15 @@
+/* Node that checks odometry and outputs the Roll and Pitch values to the console.
+ * This node can be used to validate slopes that the simulated robot may be on.
+ *
+ * For the RakerOne project, a simulated Clearpath Husky with a 16 line 3D LIDAR was assessing terrain.
+ * This node was used to validate assessed gradients from the terrain assessment functions of the robot.
+ *
+ * Modified by: Amiel Fernandez
+ *
+ * Original Author: Emiliano Borghi
+ * https://gist.github.com/eborghi10/c3302fae021f894cda531e5d2f739ac1
+*/
+
 #include <tf/tf.h>
 #include <nav_msgs/Odometry.h>
 #include <geometry_msgs/Pose.h>

@@ -1,0 +1,5 @@
+<launch>
+    <include file="$(find raker_laser_assembler)/launch/assembler.launch"/>
+    <include file="$(find raker_laser_assembler)/launch/service_client.launch"/>
+    <include file="$(find raker_laser_assembler)/launch/pcl_convert.launch"/>
+</launch>
