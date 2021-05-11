@@ -9,6 +9,8 @@ Several openly available projects were relied upon for this effort:
 
 - https://bitbucket.org/DataspeedInc/velodyne_simulator/src/master/  -- Reused Velodyne URDF/xacros for 3D Lidar, merged with the Husky.urdf.xacro
 
+- https://wiki.ros.org/laser_assembler  -- The Laser Assembler ROS node can indeed stitch pointcloud2 format messages though it is not explicitly stated in the documentation.
+
 ## Commands to run simulation
 The order of commands to perform are the following:
 
