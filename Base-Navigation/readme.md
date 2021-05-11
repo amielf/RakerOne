@@ -3,13 +3,15 @@ NOTE: Base Navigation essentially was rescope to Terrain Assessment
 
 Several openly available projects were relied upon for this effort:
 
-- https://www.clearpathrobotics.com/assets/guides/kinetic/husky/SimulatingHusky.html -- Reused Roslaunch files but changed them to use a different world environment
+- https://www.clearpathrobotics.com/assets/guides/kinetic/husky/SimulatingHusky.html -- Reused Roslaunch files but changed them to use a different world environment; reused husky model as well.  EKF_Localization was changed from 2D mode to 3D mode as well.
 
-- https://www.clearpathrobotics.com/assets/guides/kinetic/husky/HuskyMove.html
+- https://www.clearpathrobotics.com/assets/guides/kinetic/husky/HuskyMove.html  -- DID NOT reuse the navigation stack.  All movements were performed manually using cmd_vel messages.
 
 - https://bitbucket.org/DataspeedInc/velodyne_simulator/src/master/  -- Reused Velodyne URDF/xacros for 3D Lidar, merged with the Husky.urdf.xacro
 
 - https://wiki.ros.org/laser_assembler  -- The Laser Assembler ROS node can indeed stitch pointcloud2 format messages though it is not explicitly stated in the documentation.
+
+- https://gitlab.com/LIRS_Projects/LIRS-WCT -- The LIRS WCT tool was used to create the world environments with elevation changes user in the RakerOne project.  Please see their associated paper for more details.
 
 ## Commands to run simulation
 The order of commands to perform are the following:
