@@ -33,7 +33,7 @@ This readapts the husky_gazebo ros node in the ros-melodic-husky-simulator packa
 
 Note that the merged_pointcloud needs to be added as a view in RVIZ to be visualized
 
-**4. Move the robot around using rostopic pub /cmd_vel messagesp
+**4. Move the robot around using rostopic pub /cmd_vel messages.**
 
 The robot should move in the simulation and in RVIZ with a time delayed decaying merge of the LIDAR scan as a singe pointcloud.
 
