@@ -35,18 +35,18 @@ http://tacodataset.org/
 Follow the directions that they give to download their data set.
 ​
 #Folder Contents:
-checkpoints: 			TACO training save points
-deep_sort: 				original supporting code files
-demo_start: 			output from original yolo implementation
-images: 				empty (contained sample demo images for original yolo implementation)
-log:					training log data
-mAP:					ground truth files for calculating mAP
-model_data: 			original COCO weights for yolo v3 and v4
-outputs:				outputs from demonstration_custom.py
-test:					testing image data 
-tools:					original data conversion files (they dont work for converting TACO to YOLO)
-train:					training image data
-train_testingDataGen:	output images for attempts at training data generation
-trash_demo_pics:		random input images for demonstraiting effectiveness of trained network
-val:					validation image data
-yolov3:					original supporting code files
+* checkpoints: 			TACO training save points
+* deep_sort: 				original supporting code files
+* demo_start: 			output from original yolo implementation
+* images: 				empty (contained sample demo images for original yolo implementation)
+* log:					training log data
+* mAP:					ground truth files for calculating mAP
+* model_data: 			original COCO weights for yolo v3 and v4
+* outputs:				outputs from demonstration_custom.py
+* test:					testing image data 
+* tools:					original data conversion files (they dont work for converting TACO to YOLO)
+* train:					training image data
+* train_testingDataGen:	output images for attempts at training data generation
+* trash_demo_pics:		random input images for demonstraiting effectiveness of trained network
+* val:					validation image data
+* yolov3:					original supporting code files
