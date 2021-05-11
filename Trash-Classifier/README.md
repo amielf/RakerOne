@@ -1,7 +1,7 @@
-# TensorFlow-2.x-YOLOv3 and YOLOv4 from Python Lessons
-​
+**# TensorFlow-2.x-YOLOv3 and YOLOv4 from Python Lessons**
+
 YOLOv3 and YOLOv4 implementation in TensorFlow 2.x, with support for training, transfer training, object tracking mAP and so on...
-​
+
 This code is 90% from Python Lessons Github and tutorial that can be found on YouTube.
 If you want to do anything elaborate with the YOLO portion of this code, you are better off going to that source
 and starting from scratch and not trying to recycle code from someone else's tutorial.
@@ -21,20 +21,20 @@ python detection_custom.py
 ​
 ​
 ​
-## Quick training for custom TACO dataset
+**## Quick training for custom TACO dataset**
 Now, you can train it and then evaluate your model
 ```
 python train.py
 tensorboard --logdir=log
 ```
 ​
-#Data
+**#Data**
 The TACO dataset was gotten from here:
 http://tacodataset.org/
 ​
 Follow the directions that they give to download their data set.
 ​
-#Folder Contents:
+**#Folder Contents:**
 * checkpoints: 			TACO training save points
 * deep_sort: 				original supporting code files
 * demo_start: 			output from original yolo implementation
